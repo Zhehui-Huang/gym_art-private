@@ -82,7 +82,7 @@ class QuadrotorEnvMulti(gym.Env):
             self.scene.update_models(models)
 
         delta = 0.0
-        init_pos = None
+        init_state = None
         for i, e in enumerate(self.envs):
             # x = 0, -delta, +delta, -2*delta, +2*delta, etc.
             goal_x = ((-1) ** i) * (delta * math.ceil(i / 2))
@@ -94,12 +94,12 @@ class QuadrotorEnvMulti(gym.Env):
             e.rew_coeff = self.rew_coeff
 
             if i > 0:
-                e.init_pos = init_pos
+                e.init_state = init_state
 
             observation = e.reset()
 
             if i == 0:
-                init_pos = e.init_pos
+                init_state = e.init_state
 
             if self.num_agents == 1:
                 obs = observation

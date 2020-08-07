@@ -716,7 +716,7 @@ class QuadrotorSingle:
 
         self.goal = None
         self.e_id = e_id
-        self.init_pos=None
+        self.init_state = None
 
         ## Statistics vars
         self.traj_count = 0
@@ -1024,11 +1024,7 @@ class QuadrotorSingle:
         # Since being near the groud means crash we have to start above
         if z < 0.25: z = 0.25
 
-        if self.e_id == 0:
-            pos = npa(x, y, z)
-            self.init_pos = pos
-        else:
-            pos = self.init_pos
+        pos = npa(x, y, z)
 
         ##############################################################
         ## INIT STATE
@@ -1063,8 +1059,10 @@ class QuadrotorSingle:
 
         # Setting the generated state
         # print("QuadEnv: init: pos/vel/rot/omega:", pos, vel, rotation, omega)
-        self.init_state = [pos, vel, rotation, omega]
-        self.dynamics.set_state(pos, vel, rotation, omega)
+        if self.e_id == 0:
+            self.init_state = [pos, vel, rotation, omega]
+
+        self.dynamics.set_state(self.init_state[0], self.init_state[1], self.init_state[2], self.init_state[3])
         self.dynamics.reset()
 
         # Reseting some internal state (counters, etc)
