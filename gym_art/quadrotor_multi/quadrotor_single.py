@@ -643,7 +643,7 @@ class QuadrotorSingle:
                  sim_steps=2,
                  obs_repr="xyz_vxyz_R_omega", ep_time=7, obstacles_num=0, room_size=10, init_random_state=False,
                  rew_coeff=None, sense_noise=None, verbose=False, gravity=GRAV,
-                 t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False):
+                 t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, e_id=None):
         np.seterr(under='ignore')
         """
         Args:
@@ -715,6 +715,8 @@ class QuadrotorSingle:
         self.box_scale = 1.0  # scale the initialbox by this factor eache episode
 
         self.goal = None
+        self.e_id = e_id
+        self.init_pos=None
 
         ## Statistics vars
         self.traj_count = 0
@@ -1021,7 +1023,12 @@ class QuadrotorSingle:
             y = self.goal[1]
         # Since being near the groud means crash we have to start above
         if z < 0.25: z = 0.25
-        pos = npa(x, y, z)
+
+        if self.e_id == 0:
+            pos = npa(x, y, z)
+            self.init_pos = pos
+        else:
+            pos = self.init_pos
 
         ##############################################################
         ## INIT STATE

@@ -31,7 +31,7 @@ class QuadrotorEnvMulti(gym.Env):
                 dynamics_params, dynamics_change, dynamics_randomize_every, dyn_sampler_1, dyn_sampler_2,
                 raw_control, raw_control_zero_middle, dim_mode, tf_control, sim_freq, sim_steps,
                 obs_repr, ep_time, obstacles_num, room_size, init_random_state,
-                rew_coeff, sense_noise, verbose, gravity, t2w_std, t2t_std, excite, dynamics_simplification,
+                rew_coeff, sense_noise, verbose, gravity, t2w_std, t2t_std, excite, dynamics_simplification, e_id=i
             )
             self.envs.append(e)
 
@@ -81,7 +81,8 @@ class QuadrotorEnvMulti(gym.Env):
         else:
             self.scene.update_models(models)
 
-        delta = 0.3
+        delta = 0.0
+        init_pos = None
         for i, e in enumerate(self.envs):
             # x = 0, -delta, +delta, -2*delta, +2*delta, etc.
             goal_x = ((-1) ** i) * (delta * math.ceil(i / 2))
@@ -92,7 +93,13 @@ class QuadrotorEnvMulti(gym.Env):
 
             e.rew_coeff = self.rew_coeff
 
+            if i > 0:
+                e.init_pos = init_pos
+
             observation = e.reset()
+
+            if i == 0:
+                init_pos = e.init_pos
 
             if self.num_agents == 1:
                 obs = observation
