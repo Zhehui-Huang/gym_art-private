@@ -71,7 +71,11 @@ class QuadrotorDynamics(object):
                  dynamics_steps_num=1,
                  dim_mode="3D",
                  gravity=GRAV,
-                 dynamics_simplification=False):
+                 dynamics_simplification=False,
+                 e_id=0):
+
+        self.e_id = e_id
+        self.tmp_thrust_noise = []
 
         self.dynamics_steps_num = dynamics_steps_num
         self.dynamics_simplification = dynamics_simplification
@@ -250,7 +254,7 @@ class QuadrotorDynamics(object):
         return pos, vel, rot, omega
 
     def step(self, thrust_cmds, dt):
-        [self.step1(thrust_cmds, dt) for t in range(self.dynamics_steps_num)]
+        [self.step1(thrust_cmds, dt, t) for t in range(self.dynamics_steps_num)]
 
     ## Step function integrates based on current derivative values (best fits affine dynamics model)
     # thrust_cmds is motor thrusts given in normalized range [0, 1].
@@ -261,7 +265,7 @@ class QuadrotorDynamics(object):
     # rot - global
     # omega - body frame
     # goal_pos - global
-    def step1(self, thrust_cmds, dt):
+    def step1(self, thrust_cmds, dt, t=0):
         # print("thrust_cmds:", thrust_cmds)
         # uncomment for debugging. they are slow
         # assert np.all(thrust_cmds >= 0)
@@ -287,7 +291,13 @@ class QuadrotorDynamics(object):
         self.thrust_cmds_damp = self.thrust_rot_damp ** 2
 
         ## Adding noise
-        thrust_noise = thrust_cmds * self.thrust_noise.noise()
+        if self.e_id == 0:
+            thrust_noise = thrust_cmds * self.thrust_noise.noise()
+            self.tmp_thrust_noise.append(thrust_noise)
+        else:
+            assert self.tmp_thrust_noise is not None
+            thrust_noise = self.tmp_thrust_noise[t]
+
         self.thrust_cmds_damp = np.clip(self.thrust_cmds_damp + thrust_noise, 0.0, 1.0)
 
         thrusts = self.thrust_max * self.angvel2thrust(self.thrust_cmds_damp, linearity=self.motor_linearity)
@@ -673,6 +683,11 @@ class QuadrotorSingle:
             sens_noise (dict or str): sensor noise parameters. If None - no noise. If "default" then the default params are loaded. Otherwise one can provide specific params.
             excite: [bool] change the setpoint at the fixed frequency to perturb the quad
         """
+        self.tmp_sv = None
+        self.tmp_state = None
+        self.goal = None
+        self.e_id = e_id
+        self.init_state = None
         ## ARGS
         self.init_random_state = init_random_state
         self.room_size = room_size
@@ -713,10 +728,6 @@ class QuadrotorSingle:
         # if box_scale > 1.0 then it will also growevery episode
         self.box = 2.0
         self.box_scale = 1.0  # scale the initialbox by this factor eache episode
-
-        self.goal = None
-        self.e_id = e_id
-        self.init_state = None
 
         ## Statistics vars
         self.traj_count = 0
@@ -822,7 +833,7 @@ class QuadrotorSingle:
         self.dynamics = QuadrotorDynamics(model_params=dynamics_params,
                                           dynamics_steps_num=self.sim_steps, room_box=self.room_box,
                                           dim_mode=self.dim_mode,
-                                          gravity=self.gravity, dynamics_simplification=self.dynamics_simplification)
+                                          gravity=self.gravity, dynamics_simplification=self.dynamics_simplification, e_id=self.e_id)
 
         if self.verbose:
             print("#################################################")
@@ -933,7 +944,12 @@ class QuadrotorSingle:
                                                    rew_coeff=self.rew_coeff, action_prev=self.actions[1])
         self.tick += 1
         done = self.tick > self.ep_len  # or self.crashed
-        sv = self.state_vector(self)
+
+        if self.e_id == 0:
+            sv = self.state_vector(self)
+            self.tmp_sv = sv
+        else:
+            sv = self.tmp_sv
 
         self.traj_count += int(done)
 
@@ -1070,7 +1086,11 @@ class QuadrotorSingle:
         self.tick = 0
         self.actions = [np.zeros([4, ]), np.zeros([4, ])]
 
-        state = self.state_vector(self)
+        if self.e_id == 0:
+            state = self.state_vector(self)
+            self.tmp_state = state
+        else:
+            state = self.tmp_state
         return state
 
     def reset(self):

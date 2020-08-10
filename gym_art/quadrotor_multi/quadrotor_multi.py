@@ -83,6 +83,7 @@ class QuadrotorEnvMulti(gym.Env):
 
         delta = 0.0
         init_state = None
+        tmp_state = None
         for i, e in enumerate(self.envs):
             # x = 0, -delta, +delta, -2*delta, +2*delta, etc.
             goal_x = ((-1) ** i) * (delta * math.ceil(i / 2))
@@ -95,11 +96,13 @@ class QuadrotorEnvMulti(gym.Env):
 
             if i > 0:
                 e.init_state = init_state
+                e.tmp_state = tmp_state
 
             observation = e.reset()
 
             if i == 0:
                 init_state = e.init_state
+                tmp_state = e.tmp_state
 
             if self.num_agents == 1:
                 obs = observation
@@ -118,10 +121,22 @@ class QuadrotorEnvMulti(gym.Env):
         if self.num_agents <= 1:
             actions = [actions]
 
+        tmp_thrust_noise = None
+        tmp_sv = None
         for i, a in enumerate(actions):
             self.envs[i].rew_coeff = self.rew_coeff
 
+            if i > 0:
+                self.envs[i].dynamics.tmp_thrust_noise = tmp_thrust_noise
+                self.envs[i].tmp_sv = tmp_sv
+
             observation, reward, done, info = self.envs[i].step(a)
+
+            if i == 0:
+                tmp_thrust_noise = self.envs[0].dynamics.tmp_thrust_noise
+                self.envs[0].dynamics.tmp_thrust_noise = []
+
+                tmp_sv = self.envs[0].tmp_sv
 
             if self.num_agents == 1:
                 obs = observation
