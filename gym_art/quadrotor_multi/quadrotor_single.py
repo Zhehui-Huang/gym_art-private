@@ -1059,10 +1059,8 @@ class QuadrotorSingle:
 
         # Setting the generated state
         # print("QuadEnv: init: pos/vel/rot/omega:", pos, vel, rotation, omega)
-        if self.e_id == 0:
-            self.init_state = [pos, vel, rotation, omega]
-
-        self.dynamics.set_state(self.init_state[0], self.init_state[1], self.init_state[2], self.init_state[3])
+        self.init_state = [pos, vel, rotation, omega]
+        self.dynamics.set_state(pos, vel, rotation, omega)
         self.dynamics.reset()
 
         # Reseting some internal state (counters, etc)
