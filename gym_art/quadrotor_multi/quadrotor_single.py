@@ -529,7 +529,7 @@ class QuadrotorDynamics(object):
 
 
 # reasonable reward function for hovering at a goal and not flying too high
-def compute_reward_weighted(dynamics, goal, action, dt, crashed, time_remain, rew_coeff, action_prev):
+def compute_reward_weighted(dynamics, goal, action, dt, crashed, time_remain, rew_coeff, action_prev, crashed_floor, crashed_wall):
     ##################################################
     ## log to create a sharp peak at the goal
     dist = np.linalg.norm(goal - dynamics.pos)
@@ -578,6 +578,16 @@ def compute_reward_weighted(dynamics, goal, action, dt, crashed, time_remain, re
     cost_crash_raw = float(crashed)
     cost_crash = rew_coeff["crash"] * cost_crash_raw
 
+    ##################################################
+    ## loss crash details
+    # Wall
+    cost_crash_wall_raw = float(crashed_wall)
+    cost_crash_wall = rew_coeff["crash"] * cost_crash_wall_raw
+    # Floor
+    cost_crash_floor_raw = float(crashed_floor)
+    cost_crash_floor = rew_coeff["crash"] * cost_crash_floor_raw
+
+
     reward = -dt * np.sum([
         cost_pos,
         cost_effort,
@@ -596,6 +606,10 @@ def compute_reward_weighted(dynamics, goal, action, dt, crashed, time_remain, re
         'rew_pos': -cost_pos,
         'rew_action': -cost_effort,
         'rew_crash': -cost_crash,
+
+        'rew_crash_wall': -cost_crash_wall,
+        'rew_crash_floor': -cost_crash_floor,
+
         "rew_orient": -cost_orient,
         "rew_yaw": -cost_yaw,
         "rew_rot": -cost_rotation,
@@ -608,6 +622,10 @@ def compute_reward_weighted(dynamics, goal, action, dt, crashed, time_remain, re
         'rewraw_pos': -cost_pos_raw,
         'rewraw_action': -cost_effort_raw,
         'rewraw_crash': -cost_crash_raw,
+
+        'rewraw_crash_wall': -cost_crash_wall_raw,
+        'rewraw_crash_floor': -cost_crash_floor_raw,
+
         "rewraw_orient": -cost_orient_raw,
         "rewraw_yaw": -cost_yaw_raw,
         "rewraw_rot": -cost_rotation_raw,
@@ -922,6 +940,13 @@ class QuadrotorSingle:
             self.crashed = self.obstacles.detect_collision(self.dynamics)
         else:
             self.crashed = self.dynamics.pos[2] <= self.dynamics.arm
+
+        self.crashed_floor = self.dynamics.pos[2] <= self.dynamics.arm
+        self.crashed_wall = not np.array_equal(self.dynamics.pos,
+                                               np.clip(self.dynamics.pos,
+                                                       a_min=self.room_box[0],
+                                                       a_max=self.room_box[1]))
+
         self.crashed = self.crashed or not np.array_equal(self.dynamics.pos,
                                                           np.clip(self.dynamics.pos,
                                                                   a_min=self.room_box[0],
@@ -930,7 +955,8 @@ class QuadrotorSingle:
         self.time_remain = self.ep_len - self.tick
         reward, rew_info = compute_reward_weighted(self.dynamics, self.goal, action, self.dt, self.crashed,
                                                    self.time_remain,
-                                                   rew_coeff=self.rew_coeff, action_prev=self.actions[1])
+                                                   rew_coeff=self.rew_coeff, action_prev=self.actions[1],
+                                                   crashed_floor=self.crashed_floor, crashed_wall=self.crashed_wall)
         self.tick += 1
         done = self.tick > self.ep_len  # or self.crashed
         sv = self.state_vector(self)
