@@ -73,6 +73,9 @@ class QuadrotorDynamics(object):
                  gravity=GRAV,
                  dynamics_simplification=False):
 
+        self.crashed_wall = False
+        self.crashed_wall_list = []
+
         self.dynamics_steps_num = dynamics_steps_num
         self.dynamics_simplification = dynamics_simplification
         ###############################################################
@@ -250,7 +253,7 @@ class QuadrotorDynamics(object):
         return pos, vel, rot, omega
 
     def step(self, thrust_cmds, dt):
-        [self.step1(thrust_cmds, dt) for t in range(self.dynamics_steps_num)]
+        [self.step1(thrust_cmds, dt, t) for t in range(self.dynamics_steps_num)]
 
     ## Step function integrates based on current derivative values (best fits affine dynamics model)
     # thrust_cmds is motor thrusts given in normalized range [0, 1].
@@ -261,7 +264,9 @@ class QuadrotorDynamics(object):
     # rot - global
     # omega - body frame
     # goal_pos - global
-    def step1(self, thrust_cmds, dt):
+    def step1(self, thrust_cmds, dt, t=0):
+        if t == 0:
+            self.crashed_wall_list = []
         # print("thrust_cmds:", thrust_cmds)
         # uncomment for debugging. they are slow
         # assert np.all(thrust_cmds >= 0)
@@ -410,6 +415,18 @@ class QuadrotorDynamics(object):
 
         # Clipping if met the obstacle and nullify velocities (not sure what to do about accelerations)
         self.pos_before_clip = self.pos.copy()
+
+        tmp_crashed_wall = not np.array_equal(self.pos_before_clip[:2],
+                                               np.clip(self.pos_before_clip[:2],
+                                                       a_min=self.room_box[0][:2],
+                                                       a_max=self.room_box[1][:2]))
+        self.crashed_wall_list.append(tmp_crashed_wall)
+        if t == 1:
+            if any(self.crashed_wall_list):
+                self.crashed_wall = True
+            else:
+                self.crashed_wall = False
+
         self.pos = np.clip(self.pos, a_min=self.room_box[0], a_max=self.room_box[1])
         # self.vel[np.equal(self.pos, self.pos_before_clip)] = 0.
 
@@ -937,15 +954,10 @@ class QuadrotorSingle:
             self.crashed = self.dynamics.pos[2] <= self.dynamics.arm
 
         self.crashed_floor = self.dynamics.pos[2] <= self.dynamics.arm
-        self.crashed_wall = not np.array_equal(self.dynamics.pos,
-                                               np.clip(self.dynamics.pos,
-                                                       a_min=self.room_box[0],
-                                                       a_max=self.room_box[1]))
 
-        self.crashed = self.crashed or not np.array_equal(self.dynamics.pos,
-                                                          np.clip(self.dynamics.pos,
-                                                                  a_min=self.room_box[0],
-                                                                  a_max=self.room_box[1]))
+        self.crashed_wall = self.dynamics.crashed_wall
+
+        self.crashed = self.crashed or self.crashed_wall
 
         self.time_remain = self.ep_len - self.tick
         reward, rew_info = compute_reward_weighted(self.dynamics, self.goal, action, self.dt, self.crashed,
