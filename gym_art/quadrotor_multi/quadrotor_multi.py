@@ -39,6 +39,16 @@ class QuadrotorEnvMulti(gym.Env):
         self.is_multiagent = True
 
         self.envs = []
+        self.quads_dist_between_goals = quads_dist_between_goals
+        self.single_digit_goal_list = [5, 2, 7]
+        # iteratively yield the digit list
+        def gentr_fn(alist):
+            while 1:
+                for j in alist:
+                    yield j
+        self.iter_digits = gentr_fn(self.single_digit_goal_list)
+        self.set_obstacles = False     # obstacle mode
+        self.set_transition = False     # transition mode in quads_mode="digit_goals"
 
         for i in range(self.num_agents):
             e = QuadrotorSingle(
@@ -97,14 +107,25 @@ class QuadrotorEnvMulti(gym.Env):
         if self.goal_dimension == "2D":
             self.goal = []
             self.init_goal_pos = []
+                # self.settle_count = np.zeros(self.num_agents)
             for i in range(self.num_agents):
-                degree = 2 * pi * i / self.num_agents
-                goal_x = delta * np.cos(degree)
-                goal_y = delta * np.sin(degree)
-                goal = [goal_x, goal_y, 2.0]
+                if self.quads_mode == 'circular_config':
+                    degree = 2 * pi * i / self.num_agents
+                    goal_x = delta * np.cos(degree)
+                    goal_y = delta * np.sin(degree)
+                    goal = [goal_x, goal_y, 2.0]
+                    
+                elif self.quads_mode == "digit_goals":
+                    if self.set_transition:
+                        goal = self.single_digit_goal(5, i)
+                    else:
+                        goal = self.digit_goals(i)
+                elif self.quads_mode == "two_groups":
+                    self.single_digit_goal_list = [0, 1]
+                    goal = self.two_groups(0, i % 2)
+                
                 self.goal.append(goal)
                 self.init_goal_pos.append(goal)
-
             self.goal = np.array(self.goal)
         elif self.goal_dimension == "3D":
             self.goal = delta * np.array(generate_points(self.num_agents))
@@ -148,6 +169,174 @@ class QuadrotorEnvMulti(gym.Env):
         self.prev_collisions = []
         self.curr_collisions = []
         self.apply_collision_force = collision_force
+
+    def two_groups(self, mode, agent):
+        delta = self.quads_dist_between_goals
+        if mode == 0:
+            goal_x = agent
+            # goal_x = delta * agent
+            goal_y = 2.0 if agent % 2 else 0.0  # distance to other group
+            goal_z = 1.0
+
+        elif mode == 1:
+            goal_x = agent
+            # goal_x = delta * agent
+            goal_y = 0.0 if agent % 2 else 2.0  # distance to other group
+            goal_z = 1.0
+
+        return [goal_x, goal_y, goal_z]
+
+    def single_digit_goal(self, digit, agent):
+        ''' Setup goals of shape digits 0 - 9.
+        We assume the number of agents is fixed to 33 and the shape is 3x5 (col x row) .
+        '''
+        delta = self.quads_dist_between_goals
+        pi = np.pi
+        set_vertical = False
+        vertical_low = 1.0
+        vertical_high = 3.0
+        vertical_factor = 1.0
+
+        if digit == 0:
+            degree = 2 * pi * agent / self.num_agents
+            goal_x = delta * np.cos(degree)
+            goal_y = delta * np.sin(degree)
+            goal_z = 2.0
+            return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
+
+        elif digit == 1:
+            if agent % 2:
+                goal_x = delta * agent
+                goal_y = 0.0
+                goal_z = 1.0
+            else:
+                goal_x = delta * agent
+                goal_y = 2.0   # distance to other group
+                goal_z = 1.0
+
+            return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
+
+        elif digit == 2:
+            # set x-axis
+            if agent==2 or agent==3 or agent==4 or agent==10:
+                goal_x = 0.0 * delta
+            if agent==1 or agent==5 or agent==9:
+                goal_x = 1.0 * delta
+            if agent==0 or agent==6 or agent==7 or agent==8:
+                goal_x = 2.0 * delta
+            # set y-axis
+            if agent==0 or agent==1 or agent==2:
+                goal_y = vertical_low if set_vertical else 0.0 * delta
+            if agent==3:
+                goal_y = (vertical_high - vertical_low) / 4 * 1 + vertical_low if set_vertical else 1.0 * delta * vertical_factor
+            if agent==4 or agent==5 or agent==6:
+                goal_y = (vertical_high - vertical_low) / 4 * 2 + vertical_low if set_vertical else 2.0 * delta * vertical_factor
+            if agent==7:
+                goal_y = (vertical_high - vertical_low) / 4 * 3 + vertical_low if set_vertical else 3.0 * delta * vertical_factor
+            if agent==8 or agent==9 or agent==10:
+                goal_y = vertical_high if set_vertical else 4.0 * delta * vertical_factor
+            goal_z = 1.0
+            return [goal_x , goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
+
+        elif digit == 5:
+            # set x-axis
+            if agent==0 or agent==6 or agent==7 or agent==8:
+                goal_x = 0.0 * delta
+            if agent==1 or agent==5 or agent==9:
+                goal_x = 1.0 * delta
+            if agent==2 or agent==3 or agent==4 or agent==10:
+                goal_x = 2.0 * delta
+            # set y-axis
+            if agent==0 or agent==1 or agent==2:
+                goal_y = vertical_low if set_vertical else 0.0 * delta
+            if agent==3:
+                goal_y = (vertical_high - vertical_low) / 4 * 1 + vertical_low if set_vertical else 1.0 * delta * vertical_factor
+            if agent==4 or agent==5 or agent==6:
+                goal_y = (vertical_high - vertical_low) / 4 * 2 + vertical_low if set_vertical else 2.0 * delta * vertical_factor
+            if agent==7:
+                goal_y = (vertical_high - vertical_low) / 4 * 3 + vertical_low if set_vertical else 3.0 * delta * vertical_factor
+            if agent==8 or agent==9 or agent==10:
+                goal_y = vertical_high if set_vertical else 4.0 * delta * vertical_factor
+            goal_z = 1.0
+            return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
+        
+        elif digit == 7:
+            if agent == 0:
+                goal_x = 0.0
+                goal_y = vertical_high if set_vertical else 0.0
+            elif agent > 0 and agent < 4:
+                goal_x = 1.0 * delta * agent
+                goal_y = vertical_high if set_vertical else 0.0
+            else:
+                goal_x = 0.0
+                goal_y = (vertical_high - vertical_low) / 7 * (agent - 4) + vertical_low if set_vertical else 2.0 - (agent - 4) * delta
+            goal_z = 1.0
+            return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
+        else:
+            raise Exception('Sorry, only accept integers from 0 - 9.')
+
+    def digit_goals(self, agent):
+        delta = self.quads_dist_between_goals
+        pi = np.pi
+        set_vertical = True
+        vertical_low = 1.0
+        vertical_high = 3.0
+        vertical_factor = 1.7
+        horizontal_dis = 1.5
+
+        ## digit 5
+        if agent==0 or agent==6 or agent==7 or agent==8:
+            goal_x = 0.0 * delta
+        if agent==1 or agent==5 or agent==9:
+            goal_x = 1.0 * delta
+        if agent==2 or agent==3 or agent==4 or agent==10:
+            goal_x = 2.0 * delta
+        # set y-axis
+        if agent==0 or agent==1 or agent==2:
+            goal_y = vertical_low if set_vertical else 0.0 * delta
+        if agent==3:
+            goal_y = (vertical_high - vertical_low) / 4 * 1 + vertical_low if set_vertical else 1.0 * delta * vertical_factor
+        if agent==4 or agent==5 or agent==6:
+            goal_y = (vertical_high - vertical_low) / 4 * 2 + vertical_low if set_vertical else 2.0 * delta * vertical_factor
+        if agent==7:
+            goal_y = (vertical_high - vertical_low) / 4 * 3 + vertical_low if set_vertical else 3.0 * delta * vertical_factor
+        if agent==8 or agent==9 or agent==10:
+            goal_y = vertical_high if set_vertical else 4.0 * delta * vertical_factor
+
+        ## digit 2
+        # set x-axis
+        if agent==13 or agent==14 or agent==15 or agent==21:
+            goal_x = 0.0 * delta + horizontal_dis
+        if agent==12 or agent==16 or agent==20:
+            goal_x = 1.0 * delta + horizontal_dis
+        if agent==11 or agent==17 or agent==18 or agent==19:
+            goal_x = 2.0 * delta + horizontal_dis
+        # set y-axis
+        if agent==11 or agent==12 or agent==13:
+            goal_y = vertical_low if set_vertical else 0.0 * delta
+        if agent==14:
+            goal_y = (vertical_high - vertical_low) / 4 * 1 + vertical_low if set_vertical else 1.0 * delta * vertical_factor
+        if agent==15 or agent==16 or agent==17:
+            goal_y = (vertical_high - vertical_low) / 4 * 2 + vertical_low if set_vertical else 2.0 * delta * vertical_factor
+        if agent==18:
+            goal_y = (vertical_high - vertical_low) / 4 * 3 + vertical_low if set_vertical else 3.0 * delta * vertical_factor
+        if agent==19 or agent==20 or agent==21:
+            goal_y = vertical_high if set_vertical else 4.0 * delta * vertical_factor
+        goal_z = 1.0
+
+        ##  digit 7
+        if agent == 22:
+            goal_x = 0.0 + horizontal_dis * 2.3
+            goal_y = vertical_high if set_vertical else 0.0
+        elif agent > 22 and agent < 26:
+            goal_x = - (1.0 * delta * (agent - 22)) + horizontal_dis * 2.3
+            goal_y = vertical_high if set_vertical else 0.0
+        elif agent >= 26:
+            goal_x = 0.0 + horizontal_dis * 2.3
+            goal_y = (vertical_high - vertical_low) / 7 * (agent - 26) + vertical_low if set_vertical else 2.0 - (agent - 26) * delta
+        goal_z = 1.0
+
+        return [goal_x, goal_z, goal_y]
 
     def all_dynamics(self):
         return tuple(e.dynamics for e in self.envs)
@@ -249,7 +438,6 @@ class QuadrotorEnvMulti(gym.Env):
             rewards[i] += self.rew_collisions[i]
             infos[i]["rewards"]["rew_quadcol"] = self.rew_collisions[i]
             infos[i]["rewards"]["rewraw_quadcol"] = self.rew_collisions_raw[i]
-
             rewards[i] += self.rew_col_obst_quad[i]
             infos[i]["rewards"]["rew_quadcol_obstacle"] = self.rew_col_obst_quad[i]
             infos[i]["rewards"]["rewraw_quadcol_obstacle"] = self.rew_col_obst_quad_raw[i]
@@ -258,21 +446,25 @@ class QuadrotorEnvMulti(gym.Env):
             for i, e in enumerate(self.envs):
                 dis = np.linalg.norm(self.pos[i] - e.goal)
                 if abs(dis) < 0.02:
+                    tmp_rew_settle_raw = 1.0 / (dis + 1e-6)
+                    tmp_rew_settle = self.rew_coeff["quadsettle"] * tmp_rew_settle_raw
+                    self.rews_settle[i] += tmp_rew_settle
+                    self.rews_settle_raw[i] += tmp_rew_settle_raw
                     self.settle_count[i] += 1
                 else:
+                    self.rews_settle = np.zeros(self.num_agents)
+                    self.rews_settle_raw = np.zeros(self.num_agents)
                     self.settle_count = np.zeros(self.num_agents)
                     break
 
             # drones settled at the goal for 1 sec
-            control_step_for_one_sec = int(self.envs[0].control_freq)
-            tmp_count = self.settle_count >= control_step_for_one_sec
+            control_step_for_one_sec = int(self.envs[0].control_freq * 2)
+            tmp_count = self.settle_count >= int(1.0 / (self.envs[0].dt * self.envs[0].sim_steps))
             if all(tmp_count):
-                np.random.shuffle(self.goal)
+                np.random.shuffle(self.tmp_goal)
                 for i, env in enumerate(self.envs):
-                    env.goal = self.goal[i]
+                    env.goal = self.tmp_goal[i]
                     # Add settle rewards
-                    self.rews_settle_raw[i] = control_step_for_one_sec
-                    self.rews_settle[i] = self.rew_coeff["quadsettle"] * self.rews_settle_raw[i]
                     rewards[i] += self.rews_settle[i]
                     infos[i]["rewards"]["rew_quadsettle"] = self.rews_settle[i]
                     infos[i]["rewards"]["rewraw_quadsettle"] = self.rews_settle_raw[i]
@@ -310,6 +502,62 @@ class QuadrotorEnvMulti(gym.Env):
 
             for i, env in enumerate(self.envs):
                 env.goal = self.goal[i]
+        elif self.quads_mode == "two_groups":
+            for i, e in enumerate(self.envs):
+                dis = np.linalg.norm(self.pos[i] - e.goal)
+                if abs(dis) < 0.02:
+                    self.settle_count[i] += 1
+                else:
+                    self.settle_count[i] = 0
+                    break
+
+            # drones settled at the goal for 1 sec
+            control_step_for_one_sec = int(self.envs[0].control_freq * 2)
+            tmp_count = self.settle_count >= control_step_for_one_sec
+            if all(tmp_count):
+                tmp_goals = []
+                for i, env in enumerate(self.envs):
+                    if i == 0:  # switch goal after all agents are initialized
+                        self.single_digit_goal_list = [1, 0]
+                        mode = next(self.iter_digits)
+                    tmp_single_goal = self.two_groups(mode %2, i%2)
+                    env.goal = tmp_single_goal
+                   
+                    # Add settle rewards
+                    self.rews_settle_raw[i] = control_step_for_one_sec
+                    self.rews_settle[i] = self.rew_coeff[
+                        "quadsettle"] * self.rews_settle_raw[i]
+                    rewards[i] += self.rews_settle[i]
+                    infos[i]["rewards"]["rew_quadsettle"] = self.rews_settle[i]
+                    infos[i]["rewards"][
+                        "rewraw_quadsettle"] = self.rews_settle_raw[i]
+
+                self.rews_settle = np.zeros(self.num_agents)
+                self.rews_settle_raw = np.zeros(self.num_agents)
+                self.settle_count = np.zeros(self.num_agents)
+        elif self.quads_mode == "digit_goals":
+            for i, e in enumerate(self.envs):
+                dis = np.linalg.norm(self.pos[i] - e.goal)
+                if abs(dis) < 0.02:
+                    self.settle_count[i] += 1
+                else:
+                    self.settle_count[i] = 0
+                    break
+
+            # drones settled at the goal for 1 sec
+            control_step_for_one_sec = int(self.envs[0].control_freq * 2)
+            tmp_count = self.settle_count >= control_step_for_one_sec
+            if all(tmp_count):
+                tmp_goals = []
+                for i, env in enumerate(self.envs):
+                    if self.set_transition:
+                        if i ==0: # switch goal after all agents are initialized
+                            digit = next(self.iter_digits)
+                        tmp_single_goal = self.single_digit_goal(digit, i)
+                        env.goal = tmp_single_goal
+                    else:
+                        tmp_goals = self.digit_goals(i)
+                        env.goal = tmp_goals
         else:
             pass
 
