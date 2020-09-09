@@ -6,6 +6,28 @@ import gym_art.quadrotor_multi.rendering3d as r3d
 from gym_art.quadrotor_multi.quad_utils import *
 from gym_art.quadrotor_multi.params import quad_color
 
+class GlobalCamera(object):
+    def __init__(self, view_dist=4):
+        self.view_dist = view_dist
+        self.degree = 180
+
+    def reset(self, goal, pos, vel):
+        self.pos_smooth = pos
+
+    def step(self, pos, vel):
+        self.degree = (self.degree  + 0.01) % 360
+        dis = 5
+        x = dis * np.cos(self.degree) + 0.5
+        y = dis * np.sin(self.degree) + 0.5
+        self.pos_smooth = [x, y, 4] # camera position
+
+    # return eye, center, up suitable for gluLookAt
+    def look_at(self):
+        up = npa(0, 0, 1)
+        eye = self.pos_smooth
+        center = [1.7, 1.0, 2.0] #[0.2, 1.0, 1.5] # pattern center
+        return eye, center, up
+
 # for visualization.
 # a rough attempt at a reasonable third-person camera
 # that looks "over the quadrotor's shoulder" from behind

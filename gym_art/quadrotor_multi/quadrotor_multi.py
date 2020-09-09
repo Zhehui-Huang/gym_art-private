@@ -47,7 +47,7 @@ class QuadrotorEnvMulti(gym.Env):
                 for j in alist:
                     yield j
         self.iter_digits = gentr_fn(self.single_digit_goal_list)
-        self.set_obstacles = False     # obstacle mode
+        self.set_obstacles = False      # obstacle mode
         self.set_transition = False     # transition mode in quads_mode="digit_goals"
 
         for i in range(self.num_agents):
@@ -149,7 +149,6 @@ class QuadrotorEnvMulti(gym.Env):
         self.obstacle_mode = quads_obstacle_mode
         self.obstacle_num = quads_obstacle_num
         self.obstacle_type = quads_obstacle_type
-        self.obstacle_size = quads_obstacle_size
         self.set_obstacles = False
         self.obstacle_settle_count = np.zeros(self.num_agents)
 
@@ -187,15 +186,11 @@ class QuadrotorEnvMulti(gym.Env):
         return [goal_x, goal_y, goal_z]
 
     def single_digit_goal(self, digit, agent):
-        ''' Setup goals of shape digits 0 - 9.
-        We assume the number of agents is fixed to 33 and the shape is 3x5 (col x row) .
-        '''
         delta = self.quads_dist_between_goals
         pi = np.pi
-        set_vertical = False
+        set_vertical = True
         vertical_low = 1.0
         vertical_high = 3.0
-        vertical_factor = 1.0
 
         if digit == 0:
             degree = 2 * pi * agent / self.num_agents
@@ -205,15 +200,9 @@ class QuadrotorEnvMulti(gym.Env):
             return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
 
         elif digit == 1:
-            if agent % 2:
-                goal_x = delta * agent
-                goal_y = 0.0
-                goal_z = 1.0
-            else:
-                goal_x = delta * agent
-                goal_y = 2.0   # distance to other group
-                goal_z = 1.0
-
+            goal_x = delta * agent
+            goal_y = 0.0
+            goal_z = 1.0
             return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
 
         elif digit == 2:
@@ -260,11 +249,6 @@ class QuadrotorEnvMulti(gym.Env):
             goal_z = 1.0
             return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
         
-        elif digit == 7:
-            if agent == 0:
-                goal_x = 0.0
-                goal_y = vertical_high if set_vertical else 0.0
-            elif agent > 0 and agent < 4:
                 goal_x = 1.0 * delta * agent
                 goal_y = vertical_high if set_vertical else 0.0
             else:
@@ -309,12 +293,6 @@ class QuadrotorEnvMulti(gym.Env):
             goal_x = 0.0 * delta + horizontal_dis
         if agent==12 or agent==16 or agent==20:
             goal_x = 1.0 * delta + horizontal_dis
-        if agent==11 or agent==17 or agent==18 or agent==19:
-            goal_x = 2.0 * delta + horizontal_dis
-        # set y-axis
-        if agent==11 or agent==12 or agent==13:
-            goal_y = vertical_low if set_vertical else 0.0 * delta
-        if agent==14:
             goal_y = (vertical_high - vertical_low) / 4 * 1 + vertical_low if set_vertical else 1.0 * delta * vertical_factor
         if agent==15 or agent==16 or agent==17:
             goal_y = (vertical_high - vertical_low) / 4 * 2 + vertical_low if set_vertical else 2.0 * delta * vertical_factor
@@ -446,25 +424,29 @@ class QuadrotorEnvMulti(gym.Env):
             for i, e in enumerate(self.envs):
                 dis = np.linalg.norm(self.pos[i] - e.goal)
                 if abs(dis) < 0.02:
-                    tmp_rew_settle_raw = 1.0 / (dis + 1e-6)
-                    tmp_rew_settle = self.rew_coeff["quadsettle"] * tmp_rew_settle_raw
-                    self.rews_settle[i] += tmp_rew_settle
-                    self.rews_settle_raw[i] += tmp_rew_settle_raw
                     self.settle_count[i] += 1
                 else:
-                    self.rews_settle = np.zeros(self.num_agents)
-                    self.rews_settle_raw = np.zeros(self.num_agents)
-                    self.settle_count = np.zeros(self.num_agents)
+                    self.settle_count[i] = 0
                     break
 
             # drones settled at the goal for 1 sec
             control_step_for_one_sec = int(self.envs[0].control_freq * 2)
-            tmp_count = self.settle_count >= int(1.0 / (self.envs[0].dt * self.envs[0].sim_steps))
+            tmp_count = self.settle_count >= control_step_for_one_sec
             if all(tmp_count):
-                np.random.shuffle(self.tmp_goal)
+                tmp_goals = []
                 for i, env in enumerate(self.envs):
-                    env.goal = self.tmp_goal[i]
+                    if self.set_transition:
+                        if i ==0: # switch goal after all agents are initialized
+                            digit = next(self.iter_digits)
+                        tmp_single_goal = self.single_digit_goal(digit, i)
+                        env.goal = tmp_single_goal
+                    else:
+                        tmp_goals = self.digit_goals(i)
+                        env.goal = tmp_goals
+
                     # Add settle rewards
+                    self.rews_settle_raw[i] = control_step_for_one_sec
+                    self.rews_settle[i] = self.rew_coeff["quadsettle"] * self.rews_settle_raw[i]
                     rewards[i] += self.rews_settle[i]
                     infos[i]["rewards"]["rew_quadsettle"] = self.rews_settle[i]
                     infos[i]["rewards"]["rewraw_quadsettle"] = self.rews_settle_raw[i]
@@ -483,17 +465,7 @@ class QuadrotorEnvMulti(gym.Env):
                 z = random.random() * 2 * box_size
                 if z < 0.25:
                     z = 0.25
-
-                self.goal = [[x, y, z] for i in range(self.num_agents)]
-                self.goal = np.array(self.goal)
-
-                for i, env in enumerate(self.envs):
-                    env.goal = self.goal[i]
         elif self.quads_mode == "static_goal":
-            pass
-        elif self.quads_mode == "lissajous3D":
-            control_freq = self.envs[0].control_freq
-            tick = self.envs[0].tick / control_freq
             x, y, z = self.lissajous3D(tick)
             goal_x, goal_y, goal_z = self.goal[0][0], self.goal[0][1], self.goal[0][2]
             x_new, y_new, z_new = x + goal_x, y + goal_y,  z+ goal_z

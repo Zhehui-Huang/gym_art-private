@@ -31,6 +31,7 @@ class Quadrotor3DSceneMulti:
         self.models = models
 
         self.quad_transforms, self.shadow_transforms, self.goal_transforms = [], [], []
+        self.obstacles_transforms = []
 
         if goal_diameter:
             self.goal_forced_diameter = goal_diameter
@@ -69,7 +70,12 @@ class Quadrotor3DSceneMulti:
         self.cam1p = r3d.Camera(fov=90.0)
         self.cam3p = r3d.Camera(fov=45.0)
 
+<<<<<<< HEAD
         self.quad_transforms, self.shadow_transforms, self.goal_transforms, self.collision_transforms, self.obstacle_transforms = [], [], [], [], []
+=======
+        self.quad_transforms, self.shadow_transforms, self.goal_transforms = [], [], []
+        self.obstacles_transforms = []
+>>>>>>> 906f412... Vertical pattern with global camera
 
         for i, model in enumerate(self.models):
             if model is not None:
@@ -98,9 +104,15 @@ class Quadrotor3DSceneMulti:
         bodies.extend(self.goal_transforms)
         bodies.extend(self.quad_transforms)
 
+<<<<<<< HEAD
         if self.obstacle_mode != 'no_obstacles':
             self.create_obstacles()
             bodies.extend(self.obstacle_transforms)
+=======
+        # TODO: obstacles?
+        # self.create_obstacles()
+        # bodies.extend(self.obstacles_transforms)
+>>>>>>> 906f412... Vertical pattern with global camera
 
         world = r3d.World(bodies)
         batch = r3d.Batch()
@@ -108,6 +120,7 @@ class Quadrotor3DSceneMulti:
         self.scene = r3d.Scene(batches=[batch], bgcolor=(0, 0, 0))
         self.scene.initialize()
 
+<<<<<<< HEAD
         # Collision spheres have to be added in the ending after everything has been rendered, as it transparent
         bodies = []
         bodies.extend(self.collision_transforms)
@@ -131,6 +144,17 @@ class Quadrotor3DSceneMulti:
     def update_obstacles(self, obstacles):
         for i, g in enumerate(obstacles.obstacles):
             self.obstacle_transforms[i].set_transform(r3d.translate(g.pos))
+=======
+    def create_obstacles(self):
+        for i in range(3):
+            color = quad_color[i]
+            obstacle_transform = r3d.transform_and_color(np.eye(4), color, r3d.sphere(0.15, 2))
+            self.obstacles_transforms.append(obstacle_transform)
+
+    def update_obstacles(self, obstacles):
+        for i, g in enumerate(obstacles):
+            self.obstacles_transforms[i].set_transform(r3d.translate(g[0:3]))
+>>>>>>> 906f412... Vertical pattern with global camera
 
     def create_goals(self):
         for i in range(len(self.models)):
@@ -172,6 +196,7 @@ class Quadrotor3DSceneMulti:
             # self.scene.batches.extend([batch])
 
             self.update_goals(goals=goals)
+<<<<<<< HEAD
             if self.obstacle_mode != 'no_obstacles':
                 self.update_obstacles(obstacles=obstacles)
 
@@ -179,6 +204,9 @@ class Quadrotor3DSceneMulti:
             positions = np.array([dyn.pos for dyn in all_dynamics])
             collision_matrix, all_collisions = calculate_collision_matrix(positions, all_dynamics[0].arm)
             collision_sums = np.sum(collision_matrix, axis=1)
+=======
+            self.update_obstacles(obstacles=obstacles)
+>>>>>>> 906f412... Vertical pattern with global camera
 
             for i, dyn in enumerate(all_dynamics):
                 matrix = r3d.trans_and_rot(dyn.pos, dyn.rot)
@@ -189,6 +217,7 @@ class Quadrotor3DSceneMulti:
                 matrix = r3d.translate(shadow_pos)
                 self.shadow_transforms[i].set_transform_nocollide(matrix)
 
+<<<<<<< HEAD
                 matrix = r3d.translate(dyn.pos)
                 if collision_sums[i] > 0.0:
                     self.collision_transforms[i].set_transform_and_color(matrix, (1, 0, 0, 0.4))
@@ -197,11 +226,18 @@ class Quadrotor3DSceneMulti:
 
 
     def render_chase(self, all_dynamics, goals, mode='human', obstalces=None):
+=======
+    def render_chase(self, all_dynamics, goals, obstacles, mode='human'):
+>>>>>>> 906f412... Vertical pattern with global camera
         if mode == 'human':
             if self.window_target is None:
                 self.window_target = r3d.WindowTarget(self.window_w, self.window_h, resizable=self.resizable)
                 self._make_scene()
+<<<<<<< HEAD
             self.update_state(all_dynamics=all_dynamics, goals=goals, obstacles=obstalces)
+=======
+            self.update_state(all_dynamics=all_dynamics, goals=goals, obstacles=obstacles)
+>>>>>>> 906f412... Vertical pattern with global camera
             self.cam3p.look_at(*self.chase_cam.look_at())
             r3d.draw(self.scene, self.cam3p, self.window_target)
             return None
@@ -213,4 +249,3 @@ class Quadrotor3DSceneMulti:
             self.cam3p.look_at(*self.chase_cam.look_at())
             r3d.draw(self.scene, self.cam3p, self.video_target)
             return np.flipud(self.video_target.read())
-

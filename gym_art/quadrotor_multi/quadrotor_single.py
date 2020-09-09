@@ -831,7 +831,11 @@ class QuadrotorSingle:
             else:
                 self.viewpoint = 'chase'
         else:
+<<<<<<< HEAD
             self.viewpoint = 'global'
+=======
+            self.viewpoint = 'global' # 'chase'
+>>>>>>> 906f412... Vertical pattern with global camera
 
         ################################################################################
         ## EPISODE PARAMS
