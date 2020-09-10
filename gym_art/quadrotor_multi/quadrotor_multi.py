@@ -87,6 +87,7 @@ class QuadrotorEnvMulti(gym.Env):
                 goal = self.single_digit_goal(5, i)
             else:
                 goal = self.digit_goals(i)
+
             self.goal.append(goal)
 
         self.goal = np.array(self.goal)
@@ -251,9 +252,6 @@ class QuadrotorEnvMulti(gym.Env):
         print(agent, goal_x, goal_z, goal_y)
         return [goal_x, goal_z, goal_y]
 
-
-
-
     def all_dynamics(self):
         return tuple(e.dynamics for e in self.envs)
 
@@ -385,7 +383,7 @@ class QuadrotorEnvMulti(gym.Env):
                 self.goal = [[x, y, z] for i in range(self.num_agents)]
                 self.goal = np.array(self.goal)
 
-            for i, env in enumerate(self.envs):
+                for i, env in enumerate(self.envs):
                     env.goal = self.goal[i]
 
         ## DONES
