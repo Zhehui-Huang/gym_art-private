@@ -31,6 +31,12 @@ class QuadrotorEnvMulti(gym.Env):
         self.envs = []
         self.quads_dist_between_goals = quads_dist_between_goals
         self.digit_goals_list = [5, 2, 7]
+        # iteratively yield the digit list
+        def gentr_fn(alist): 
+            while 1:
+                for j in alist:
+                    yield j
+        self.iter_digits = gentr_fn(self.digit_goals_list)
 
         for i in range(self.num_agents):
             e = QuadrotorSingle(
@@ -70,13 +76,12 @@ class QuadrotorEnvMulti(gym.Env):
         ## Aux variables
         self.pos = np.zeros([self.num_agents, 3]) #Matrix containing all positions
         self.quads_mode = quads_mode
-	
+
 	## Set Goals
         self.goal = []
-        for digit in self.digit_goals_list: 
-            for i in range(self.num_agents):
-                goal = self.digit_goals(digit, i)
-                self.goal.append(goal)
+        for i in range(self.num_agents):
+            goal = self.digit_goals(5, i)
+            self.goal.append(goal)
 
         self.goal = np.array(self.goal)
         self.rews_settle = np.zeros(self.num_agents)
@@ -96,13 +101,13 @@ class QuadrotorEnvMulti(gym.Env):
             goal_y = delta * np.sin(degree)
             goal_z = 2.0
             return [goal_x, goal_y, goal_z]
-        
+
         elif digit == 1:
             goal_x = delta * agent
             goal_y = 0.0
             goal_z = 2.0
             return [goal_x, goal_y, goal_z]
-        
+
         elif digit == 2:
             # set x-axis
             if agent==2 or agent==3 or agent==4 or agent==10:
@@ -124,7 +129,7 @@ class QuadrotorEnvMulti(gym.Env):
                 goal_y = 4.0 * delta
             goal_z = 2.0
             return [goal_x, goal_y, goal_z]
-        
+
         elif digit == 3:
             raise NotImplementedError
         elif digit == 4:
@@ -153,13 +158,15 @@ class QuadrotorEnvMulti(gym.Env):
         elif digit == 6:
             raise NotImplementedError
         elif digit == 7:
-            # set x-axis
-            if agent < 5:
-                goal_x = 1.0 * delta
+            if agent == 0:
+                goal_x = 0.0
+                goal_y = 0.0
+            elif agent > 0 and agent < 3:
+                goal_x = 1.0 * delta * agent
                 goal_y = 0.0
             else:
-                goal_x = 4.0 * delta
-                goal_y = 1.0 * (agent - 4) * delta 
+                goal_x = 0.0
+                goal_y = 1.0 * (agent - 3) * delta 
             goal_z = 2.0
             return [goal_x, goal_y, goal_z]
         elif digit == 8:
@@ -252,21 +259,21 @@ class QuadrotorEnvMulti(gym.Env):
         if self.quads_mode == "circular_config":
             for i, e in enumerate(self.envs):
                 dis = np.linalg.norm(self.pos[i] - e.goal)
-                if abs(dis) < 0.2:
+                if abs(dis) <2:
                     self.settle_count[i] += 1
                 else:
                     self.settle_count[i] = 0
                     break
 
             # drones settled at the goal for 1 sec
-            control_step_for_one_sec = int(self.envs[0].control_freq * 0.03)
+            control_step_for_one_sec = int(self.envs[0].control_freq * 1)
             tmp_count = self.settle_count >= control_step_for_one_sec
             if all(tmp_count):
-                # np.random.shuffle(self.goal)
-                # TODO: digits transition
-                self.goal = [2]
                 for i, env in enumerate(self.envs):
-                    env.goal = self.goal[i]
+                    if i ==0: # switch goal after all agents are initialized
+                        digit = next(self.iter_digits)
+                    tmp_single_goal = self.digit_goals(digit, i)
+                    env.goal = tmp_single_goal
                     # Add settle rewards
                     self.rews_settle_raw[i] = control_step_for_one_sec
                     self.rews_settle[i] = self.rew_coeff["quadsettle"] * self.rews_settle_raw[i]
@@ -277,6 +284,7 @@ class QuadrotorEnvMulti(gym.Env):
                 self.rews_settle = np.zeros(self.num_agents)
                 self.rews_settle_raw = np.zeros(self.num_agents)
                 self.settle_count = np.zeros(self.num_agents)
+
         elif self.quads_mode == "same_goal":
             tick = self.envs[0].tick
             # teleport every 5 secs
@@ -347,3 +355,4 @@ class QuadrotorEnvMulti(gym.Env):
         self.frames_since_last_render = 0
 
         self.simulation_start_time = time.time()
+
