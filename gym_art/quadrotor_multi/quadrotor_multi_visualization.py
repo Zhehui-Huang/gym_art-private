@@ -105,6 +105,9 @@ class Quadrotor3DSceneMulti:
             goal_transform = r3d.transform_and_color(np.eye(4), color, r3d.sphere(self.goal_diameter / 2, 18))
             self.goal_transforms.append(goal_transform)
 
+        # create a `5` pattern
+  
+
     def update_goals(self, goals):
         for i, g in enumerate(goals):
             self.goal_transforms[i].set_transform(r3d.translate(g[0:3]))

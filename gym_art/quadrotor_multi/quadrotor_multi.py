@@ -29,6 +29,8 @@ class QuadrotorEnvMulti(gym.Env):
         self.num_agents = num_agents
         self.swarm_obs = swarm_obs
         self.envs = []
+        self.quads_dist_between_goals = quads_dist_between_goals
+        self.digit_goals_list = [5, 2, 7]
 
         for i in range(self.num_agents):
             e = QuadrotorSingle(
@@ -70,20 +72,102 @@ class QuadrotorEnvMulti(gym.Env):
         self.quads_mode = quads_mode
 	
 	## Set Goals
-        delta = quads_dist_between_goals
-        pi = np.pi
         self.goal = []
-        for i in range(self.num_agents):
-            degree = 2 * pi * i / self.num_agents
-            goal_x = delta * np.cos(degree)
-            goal_y = delta * np.sin(degree)
-            goal = [goal_x, goal_y, 2.0]
-            self.goal.append(goal)
+        for digit in self.digit_goals_list: 
+            for i in range(self.num_agents):
+                goal = self.digit_goals(digit, i)
+                self.goal.append(goal)
 
         self.goal = np.array(self.goal)
         self.rews_settle = np.zeros(self.num_agents)
         self.rews_settle_raw = np.zeros(self.num_agents)
         self.settle_count = np.zeros(self.num_agents)
+
+    def digit_goals(self, digit, agent):
+        ''' Setup goals of shape digits 0 - 9.
+        We assume the number of agents is fixed and the shape is 3x5 (col x row) .
+        '''
+        delta = self.quads_dist_between_goals
+        pi = np.pi
+
+        if digit == 0:
+            degree = 2 * pi * agent / self.num_agents
+            goal_x = delta * np.cos(degree)
+            goal_y = delta * np.sin(degree)
+            goal_z = 2.0
+            return [goal_x, goal_y, goal_z]
+        
+        elif digit == 1:
+            goal_x = delta * agent
+            goal_y = 0.0
+            goal_z = 2.0
+            return [goal_x, goal_y, goal_z]
+        
+        elif digit == 2:
+            # set x-axis
+            if agent==2 or agent==3 or agent==4 or agent==10:
+                goal_x = 0.0 * delta
+            if agent==1 or agent==5 or agent==9:
+                goal_x = 1.0 * delta
+            if agent==0 or agent==6 or agent==7 or agent==8:
+                goal_x = 2.0 * delta
+            # set y-axis
+            if agent==0 or agent==1 or agent==2:
+                goal_y = 0.0 * delta
+            if agent==3:
+                goal_y = 1.0 * delta
+            if agent==4 or agent==5 or agent==6:
+                goal_y = 2.0 * delta
+            if agent==7:
+                goal_y = 3.0 * delta
+            if agent==8 or agent==9 or agent==10:
+                goal_y = 4.0 * delta
+            goal_z = 2.0
+            return [goal_x, goal_y, goal_z]
+        
+        elif digit == 3:
+            raise NotImplementedError
+        elif digit == 4:
+            raise NotImplementedError
+        elif digit == 5:
+            # set x-axis
+            if agent==0 or agent==6 or agent==7 or agent==8:
+                goal_x = 0.0 * delta
+            if agent==1 or agent==5 or agent==9:
+                goal_x = 1.0 * delta
+            if agent==2 or agent==3 or agent==4 or agent==10:
+                goal_x = 2.0 * delta
+            # set y-axis
+            if agent==0 or agent==1 or agent==2:
+                goal_y = 0.0 * delta
+            if agent==3:
+                goal_y = 1.0 * delta
+            if agent==4 or agent==5 or agent==6:
+                goal_y = 2.0 * delta
+            if agent==7:
+                goal_y = 3.0 * delta
+            if agent==8 or agent==9 or agent==10:
+                goal_y = 4.0 * delta
+            goal_z = 2.0
+            return [goal_x, goal_y, goal_z]
+        elif digit == 6:
+            raise NotImplementedError
+        elif digit == 7:
+            # set x-axis
+            if agent < 5:
+                goal_x = 1.0 * delta
+                goal_y = 0.0
+            else:
+                goal_x = 4.0 * delta
+                goal_y = 1.0 * (agent - 4) * delta 
+            goal_z = 2.0
+            return [goal_x, goal_y, goal_z]
+        elif digit == 8:
+            raise NotImplementedError
+        elif digit == 9:
+            raise NotImplementedError
+        else:
+            raise Exception('Sorry, only accept integers from 0 - 9.')
 
     def all_dynamics(self):
         return tuple(e.dynamics for e in self.envs)
@@ -168,17 +252,19 @@ class QuadrotorEnvMulti(gym.Env):
         if self.quads_mode == "circular_config":
             for i, e in enumerate(self.envs):
                 dis = np.linalg.norm(self.pos[i] - e.goal)
-                if abs(dis) < 0.02:
+                if abs(dis) < 0.2:
                     self.settle_count[i] += 1
                 else:
                     self.settle_count[i] = 0
                     break
 
             # drones settled at the goal for 1 sec
-            control_step_for_one_sec = int(self.envs[0].control_freq)
+            control_step_for_one_sec = int(self.envs[0].control_freq * 0.03)
             tmp_count = self.settle_count >= control_step_for_one_sec
             if all(tmp_count):
-                np.random.shuffle(self.goal)
+                # np.random.shuffle(self.goal)
+                # TODO: digits transition
+                self.goal = [2]
                 for i, env in enumerate(self.envs):
                     env.goal = self.goal[i]
                     # Add settle rewards
