@@ -57,10 +57,7 @@ class TestMultiEnv(TestCase):
         time.sleep(0.1)
 
         num_steps = 0
-        render_n_frames = 500
-
-        render_start = None
-        while num_steps < render_n_frames:
+        while num_steps < 100:
             obs, rewards, dones, infos = env.step([env.action_space.sample() for _ in range(num_agents)])
             num_steps += 1
             # print('Rewards: ', rewards, "\nCollisions: \n", env.collisions, "\nDistances: \n", env.dist)
