@@ -99,6 +99,7 @@ class QuadrotorEnvMulti(gym.Env):
         self.clip_neighbor_space_min_box = self.observation_space.low[obs_self_size:obs_self_size+self.clip_neighbor_space_length]
         self.clip_neighbor_space_max_box = self.observation_space.high[obs_self_size:obs_self_size+self.clip_neighbor_space_length]
 
+
 	    ## Set Goals
         self.goal_dimension = quads_goal_dimension
         delta = quads_dist_between_goals
