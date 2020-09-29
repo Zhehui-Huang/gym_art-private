@@ -809,7 +809,7 @@ class QuadrotorSingle:
         if self.dim_mode == '1D' or self.dim_mode == '2D':
             self.viewpoint = 'side'
         else:
-            self.viewpoint = 'chase'
+            self.viewpoint = 'global' # 'chase'
 
         ################################################################################
         ## EPISODE PARAMS
