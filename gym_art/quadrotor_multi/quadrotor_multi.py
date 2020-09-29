@@ -58,10 +58,6 @@ class QuadrotorEnvMulti(gym.Env):
                 rew_coeff, sense_noise, verbose, gravity, t2w_std, t2t_std, excite, dynamics_simplification,
                 quads_use_numba, self.swarm_obs, self.num_agents, quads_settle, quads_settle_range_coeff, quads_vel_reward_out_range, quads_view_mode, 
                 quads_obstacle_mode, quads_obstacle_num
-            )
-            self.envs.append(e)
-
-        self.resample_goals = resample_goals
 
         self.scene = None
 
@@ -324,8 +320,8 @@ class QuadrotorEnvMulti(gym.Env):
         obs_neighbors = []
         for i in range(len(obs)):
             observs = obs[i]
-            obs_neighbor = np.array([obs[j][:self.neighbor_obs_size] for j in range(len(obs)) if j != i])
-            obs_neighbor_rel = obs_neighbor - observs[:self.neighbor_obs_size]
+            obs_neighbor = np.array([obs[j][:6] for j in range(len(obs)) if j != i])
+            obs_neighbor_rel = obs_neighbor - observs[:6]
             obs_neighbors.append(obs_neighbor_rel.reshape(-1))
         obs_neighbors = np.stack(obs_neighbors)
 

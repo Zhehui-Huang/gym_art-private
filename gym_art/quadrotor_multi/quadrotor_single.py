@@ -685,12 +685,16 @@ class QuadrotorSingle:
                  obs_repr="xyz_vxyz_R_omega", ep_time=7, obstacles_num=0, room_size=10, init_random_state=False,
                  rew_coeff=None, sense_noise=None, verbose=False, gravity=GRAV,
 <<<<<<< HEAD
+<<<<<<< HEAD
                  t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, use_numba=False, swarm_obs=False, num_agents=1,quads_settle=False,
                  quads_settle_range_coeff=10, quads_vel_reward_out_range=0.8,
                  view_mode='local', obstacle_mode='no_obstacles', obstacle_num=0):
 =======
                  t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, use_numba=False):
 >>>>>>> 123b27e... Created numba based functions for step1 and add_noise (#8)
+=======
+                 t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, use_numba=False, swarm_obs=False, num_agents=1):
+>>>>>>> 6697a71... Multi quad (#9)
         np.seterr(under='ignore')
         """
         Args:
@@ -955,10 +959,14 @@ class QuadrotorSingle:
 
         obs_comps = self.obs_repr.split("_")
         if self.swarm_obs and self.num_agents > 1:
+<<<<<<< HEAD
             obs_comps = obs_comps + (['rxyz'] + ['rvxyz']) * (self.num_agents-1)
         if self.obstacle_mode != 'no_obstacles':
             obs_comps = obs_comps + (['rorot'] + ['rosize'] +['roxyz'] + ['rovxyz']) * (self.obstacle_num)
 
+=======
+            obs_comps = obs_comps + (['xyz'] + ['vxyz']) * (self.num_agents-1)
+>>>>>>> 6697a71... Multi quad (#9)
         print("Observation components:", obs_comps)
         obs_low, obs_high = [], []
         for comp in obs_comps:
