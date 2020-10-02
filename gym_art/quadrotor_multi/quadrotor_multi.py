@@ -40,7 +40,7 @@ class QuadrotorEnvMulti(gym.Env):
 
         self.envs = []
         self.quads_dist_between_goals = quads_dist_between_goals
-        self.single_digit_goal_list = [5, 2, 7]
+        self.single_digit_goal_list = [1, 0]
         # iteratively yield the digit list
         def gentr_fn(alist):
             while 1:
@@ -110,8 +110,7 @@ class QuadrotorEnvMulti(gym.Env):
                     degree = 2 * pi * i / self.num_agents
                     goal_x = delta * np.cos(degree)
                     goal_y = delta * np.sin(degree)
-                    goal = [goal_x, goal_y, 2.0]
-                    
+                    goal = [goal_x, goal_y, 2.0]     
                 elif self.quads_mode == "digit_goals":
                     if self.set_transition:
                         goal = self.single_digit_goal(5, i)
@@ -183,11 +182,15 @@ class QuadrotorEnvMulti(gym.Env):
         return [goal_x, goal_y, goal_z]
 
     def single_digit_goal(self, digit, agent):
+        ''' Setup goals of shape digits 0 - 9.
+        We assume the number of agents is fixed to 33 and the shape is 3x5 (col x row) .
+        '''
         delta = self.quads_dist_between_goals
         pi = np.pi
-        set_vertical = True
+        set_vertical = False
         vertical_low = 1.0
         vertical_high = 3.0
+        vertical_factor = 1.0
 
         if digit == 0:
             degree = 2 * pi * agent / self.num_agents
@@ -197,9 +200,15 @@ class QuadrotorEnvMulti(gym.Env):
             return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
 
         elif digit == 1:
-            goal_x = delta * agent
-            goal_y = 0.0
-            goal_z = 1.0
+            if agent % 2:
+                goal_x = delta * agent
+                goal_y = 0.0
+                goal_z = 1.0
+            else:
+                goal_x = delta * agent
+                goal_y = 2.0   # distance to other group
+                goal_z = 1.0
+
             return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
 
         elif digit == 2:
@@ -246,6 +255,11 @@ class QuadrotorEnvMulti(gym.Env):
             goal_z = 1.0
             return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
         
+        elif digit == 7:
+            if agent == 0:
+                goal_x = 0.0
+                goal_y = vertical_high if set_vertical else 0.0
+            elif agent > 0 and agent < 4:
                 goal_x = 1.0 * delta * agent
                 goal_y = vertical_high if set_vertical else 0.0
             else:
@@ -320,8 +334,8 @@ class QuadrotorEnvMulti(gym.Env):
         obs_neighbors = []
         for i in range(len(obs)):
             observs = obs[i]
-            obs_neighbor = np.array([obs[j][:6] for j in range(len(obs)) if j != i])
-            obs_neighbor_rel = obs_neighbor - observs[:6]
+            obs_neighbor = np.array([obs[j][:self.neighbor_obs_size] for j in range(len(obs)) if j != i])
+            obs_neighbor_rel = obs_neighbor - observs[:self.neighbor_obs_size]
             obs_neighbors.append(obs_neighbor_rel.reshape(-1))
         obs_neighbors = np.stack(obs_neighbors)
 
@@ -341,33 +355,6 @@ class QuadrotorEnvMulti(gym.Env):
                 models=models,
                 w=640, h=480, resizable=True, obstacles=self.obstacles, viewpoint=self.envs[0].viewpoint,
                 obstacle_mode=self.obstacle_mode
-            )
-        else:
-            self.scene.update_models(models)
-
-        for i, e in enumerate(self.envs):
-            self.goal[i] = self.init_goal_pos[i]
-            e.goal = self.goal[i]
-            e.rew_coeff = self.rew_coeff
-
-            observation = e.reset()
-            obs.append(observation)
-
-        # extend obs to see neighbors
-        if self.swarm_obs and self.num_agents > 1:
-            obs_ext = self.extend_obs_space(obs)
-            obs = obs_ext
-
-        # Reset Obstacles
-        self.set_obstacles = False
-        self.obstacle_settle_count = np.zeros(self.num_agents)
-        quads_pos = np.array([e.dynamics.pos for e in self.envs])
-        quads_vel = np.array([e.dynamics.vel for e in self.envs])
-        obs = self.obstacles.reset(obs=obs, quads_pos=quads_pos, quads_vel=quads_vel, set_obstacles=self.set_obstacles)
-
-        self.scene.reset(tuple(e.goal for e in self.envs), self.all_dynamics(), obstacles=self.obstacles)
-
-        self.collisions_per_episode = 0
         return obs
 
     # noinspection PyTypeChecker
@@ -432,14 +419,7 @@ class QuadrotorEnvMulti(gym.Env):
             if all(tmp_count):
                 tmp_goals = []
                 for i, env in enumerate(self.envs):
-                    if self.set_transition:
-                        if i ==0: # switch goal after all agents are initialized
-                            digit = next(self.iter_digits)
-                        tmp_single_goal = self.single_digit_goal(digit, i)
-                        env.goal = tmp_single_goal
-                    else:
-                        tmp_goals = self.digit_goals(i)
-                        env.goal = tmp_goals
+                    env.goal = self.goal[i]
 
                     # Add settle rewards
                     self.rews_settle_raw[i] = control_step_for_one_sec
@@ -527,6 +507,17 @@ class QuadrotorEnvMulti(gym.Env):
                     else:
                         tmp_goals = self.digit_goals(i)
                         env.goal = tmp_goals
+
+                    # Add settle rewards
+                    self.rews_settle_raw[i] = control_step_for_one_sec
+                    self.rews_settle[i] = self.rew_coeff["quadsettle"] * self.rews_settle_raw[i]
+                    rewards[i] += self.rews_settle[i]
+                    infos[i]["rewards"]["rew_quadsettle"] = self.rews_settle[i]
+                    infos[i]["rewards"]["rewraw_quadsettle"] = self.rews_settle_raw[i]
+
+                self.rews_settle = np.zeros(self.num_agents)
+                self.rews_settle_raw = np.zeros(self.num_agents)
+                self.settle_count = np.zeros(self.num_agents)
         else:
             pass
 

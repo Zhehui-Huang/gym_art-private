@@ -840,10 +840,14 @@ class QuadrotorSingle:
                 self.viewpoint = 'chase'
         else:
 <<<<<<< HEAD
+<<<<<<< HEAD
             self.viewpoint = 'global'
 =======
             self.viewpoint = 'global' # 'chase'
 >>>>>>> 906f412... Vertical pattern with global camera
+=======
+            self.viewpoint = 'chase' #'global' # 'chase'
+>>>>>>> 3ad89af... Add collision visualization
 
         ################################################################################
         ## EPISODE PARAMS
@@ -960,6 +964,7 @@ class QuadrotorSingle:
         obs_comps = self.obs_repr.split("_")
         if self.swarm_obs and self.num_agents > 1:
 <<<<<<< HEAD
+<<<<<<< HEAD
             obs_comps = obs_comps + (['rxyz'] + ['rvxyz']) * (self.num_agents-1)
         if self.obstacle_mode != 'no_obstacles':
             obs_comps = obs_comps + (['rorot'] + ['rosize'] +['roxyz'] + ['rovxyz']) * (self.obstacle_num)
@@ -967,6 +972,9 @@ class QuadrotorSingle:
 =======
             obs_comps = obs_comps + (['xyz'] + ['vxyz']) * (self.num_agents-1)
 >>>>>>> 6697a71... Multi quad (#9)
+=======
+            obs_comps = obs_comps + (['rxyz'] + ['rvxyz']) * (self.num_agents-1)
+>>>>>>> 00964cf... Modify extend_obs_space func (#10)
         print("Observation components:", obs_comps)
         obs_low, obs_high = [], []
         for comp in obs_comps:
