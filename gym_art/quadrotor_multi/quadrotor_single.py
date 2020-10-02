@@ -920,7 +920,7 @@ class QuadrotorSingle:
 
         obs_comps = self.obs_repr.split("_")
         if self.swarm_obs and self.num_agents > 1:
-            obs_comps = obs_comps + (['xyz'] + ['vxyz']) * (self.num_agents-1)
+            obs_comps = obs_comps + (['rxyz'] + ['rvxyz']) * (self.num_agents-1)
         print("Observation components:", obs_comps)
         obs_low, obs_high = [], []
         for comp in obs_comps:
