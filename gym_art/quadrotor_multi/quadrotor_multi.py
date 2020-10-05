@@ -20,12 +20,14 @@ class QuadrotorEnvMulti(gym.Env):
                  sim_steps=2, obs_repr='xyz_vxyz_R_omega', ep_time=7, obstacles_num=0, room_size=10,
                  init_random_state=False, rew_coeff=None, sense_noise=None, verbose=False, gravity=GRAV,
                  resample_goals=False, t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False,
-                 quads_dist_between_goals=0.3, quads_mode='circular_config', swarm_obs=False, quads_use_numba=False):
+                 quads_dist_between_goals=0.3, quads_mode='circular_config', swarm_obs=False, quads_use_numba=False,
+                 obs_space_scale=1.0):
 
         super().__init__()
 
         self.num_agents = num_agents
         self.swarm_obs = swarm_obs
+        self.obs_space_scale = obs_space_scale
         self.envs = []
 
         for i in range(self.num_agents):
@@ -133,6 +135,7 @@ class QuadrotorEnvMulti(gym.Env):
 
         self.scene.reset(tuple(e.goal for e in self.envs), self.all_dynamics())
 
+        obs = np.array(obs) * self.obs_space_scale
         return obs
 
     # noinspection PyTypeChecker
@@ -220,6 +223,7 @@ class QuadrotorEnvMulti(gym.Env):
             obs = self.reset()
             dones = [True] * len(dones)  # terminate the episode for all "sub-envs"
 
+        obs = np.array(obs) * self.obs_space_scale
         return obs, rewards, dones, infos
 
     def render(self, mode='human'):
