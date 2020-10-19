@@ -38,7 +38,7 @@ class QuadrotorEnvMulti(gym.Env):
                     yield j
         self.iter_digits = gentr_fn(self.single_digit_goal_list)
         self.set_obstacles = False    # obstacle mode
-        self.set_transition = True  # transition mode
+        self.set_transition = False  # transition mode
 
         for i in range(self.num_agents):
             e = QuadrotorSingle(
@@ -155,7 +155,6 @@ class QuadrotorEnvMulti(gym.Env):
             if agent==8 or agent==9 or agent==10:
                 goal_y = vertical_high if set_vertical else 4.0 * delta * vertical_factor
             goal_z = 1.0
-            print(digit, ': ', goal_x, goal_z, goal_y)
             return [goal_x , goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
 
         elif digit == 5:
@@ -178,7 +177,6 @@ class QuadrotorEnvMulti(gym.Env):
             if agent==8 or agent==9 or agent==10:
                 goal_y = vertical_high if set_vertical else 4.0 * delta * vertical_factor
             goal_z = 1.0
-            print(digit, ': ', goal_x, goal_z, goal_y)
             return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z]
         elif digit == 7:
             if agent == 0:
@@ -191,7 +189,6 @@ class QuadrotorEnvMulti(gym.Env):
                 goal_x = 0.0
                 goal_y = (vertical_high - vertical_low) / 7 * (agent - 4) + vertical_low if set_vertical else 2.0 - (agent - 4) * delta
             goal_z = 1.0
-            print(digit, ': ', goal_x, goal_z, goal_y)
             return [goal_x, goal_z, goal_y] if set_vertical else [goal_x, goal_y, goal_z] 
         else:
             raise Exception('Sorry, only accept integers from 0 - 9.')
@@ -257,7 +254,6 @@ class QuadrotorEnvMulti(gym.Env):
             goal_y = (vertical_high - vertical_low) / 7 * (agent - 26) + vertical_low if set_vertical else 2.0 - (agent - 26) * delta
         goal_z = 1.0
 
-        print(agent, goal_x, goal_z, goal_y)
         return [goal_x, goal_z, goal_y]
 
     def all_dynamics(self):
