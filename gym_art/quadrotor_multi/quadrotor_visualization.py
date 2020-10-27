@@ -240,7 +240,7 @@ class Quadrotor3DScene(object):
             np.eye(4), (0, 0, 0, 0.4), r3d.circle(0.75*self.diameter, 32))
 
         # TODO make floor size or walls to indicate world_box
-        floor = r3d.ProceduralTexture(r3d.random_textype(), (0.15, 0.25),
+        floor = r3d.ProceduralTexture(0, (0.15, 0.25),
             r3d.rect((1000, 1000), (0, 100), (0, 100)))
 
         self.update_goal_diameter()
