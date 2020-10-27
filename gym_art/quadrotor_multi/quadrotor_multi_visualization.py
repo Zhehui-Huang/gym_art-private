@@ -78,7 +78,7 @@ class Quadrotor3DSceneMulti:
             )
 
         # TODO make floor size or walls to indicate world_box
-        floor = r3d.ProceduralTexture(r3d.random_textype(), (0.15, 0.25),
+        floor = r3d.ProceduralTexture(0, (0.15, 0.25),
                                       r3d.rect((1000, 1000), (0, 100), (0, 100)))
 
         self.update_goal_diameter()
