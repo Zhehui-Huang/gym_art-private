@@ -9,6 +9,7 @@ from collections import deque
 
 import gym
 
+from gym_art.quadrotor_multi.quad_utils import generate_points
 from gym_art.quadrotor_multi.quadrotor_single import GRAV, QuadrotorSingle
 from gym_art.quadrotor_multi.quadrotor_multi_visualization import Quadrotor3DSceneMulti
 
@@ -22,7 +23,8 @@ class QuadrotorEnvMulti(gym.Env):
                  sim_steps=2, obs_repr='xyz_vxyz_R_omega', ep_time=7, obstacles_num=0, room_size=10,
                  init_random_state=False, rew_coeff=None, sense_noise=None, verbose=False, gravity=GRAV,
                  resample_goals=False, t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False,
-                 quads_dist_between_goals=0.3, quads_mode='circular_config', swarm_obs=False, quads_use_numba=False):
+                 quads_dist_between_goals=0.0, quads_mode='static_goal', swarm_obs=False, quads_use_numba=False,
+                 quads_goal_dimension='2D', quads_obstacle_mode='None', quads_view_mode='follow'):
 
         super().__init__()
 
@@ -36,7 +38,7 @@ class QuadrotorEnvMulti(gym.Env):
                 raw_control, raw_control_zero_middle, dim_mode, tf_control, sim_freq, sim_steps,
                 obs_repr, ep_time, obstacles_num, room_size, init_random_state,
                 rew_coeff, sense_noise, verbose, gravity, t2w_std, t2t_std, excite, dynamics_simplification,
-                quads_use_numba, self.swarm_obs, self.num_agents
+                quads_use_numba, self.swarm_obs, self.num_agents, quads_view_mode
             )
             self.envs.append(e)
 
@@ -73,22 +75,49 @@ class QuadrotorEnvMulti(gym.Env):
         self.clip_min_box = self.observation_space.low[-self.clip_length:]
         self.clip_max_box = self.observation_space.high[-self.clip_length:]
 
-	## Set Goals
+        ## Set Goals
+        self.goal_dimension = quads_goal_dimension
         delta = quads_dist_between_goals
         pi = np.pi
-        self.goal = []
-        for i in range(self.num_agents):
-            degree = 2 * pi * i / self.num_agents
-            goal_x = delta * np.cos(degree)
-            goal_y = delta * np.sin(degree)
-            goal = [goal_x, goal_y, 2.0]
-            self.goal.append(goal)
+        if self.goal_dimension == "2D":
+            self.goal = []
+            for i in range(self.num_agents):
+                degree = 2 * pi * i / self.num_agents
+                goal_x = delta * np.cos(degree)
+                goal_y = delta * np.sin(degree)
+                goal = [goal_x, goal_y, 2.0]
+                self.goal.append(goal)
+            self.goal = np.array(self.goal)
+        elif self.goal_dimension == "3D":
+            self.goal = delta * np.array(generate_points(self.num_agents))
+            self.goal[:, 2] += 2.0
+        else:
+            raise NotImplementedError()
 
-        self.goal = np.array(self.goal)
         self.rews_settle = np.zeros(self.num_agents)
         self.rews_settle_raw = np.zeros(self.num_agents)
         self.settle_count = np.zeros(self.num_agents)
 
+        ## Set Obstacles
+        self.obstacle_mode = quads_obstacle_mode
+        self.obstacles = None
+        if self.obstacle_mode == 'None"':
+            pass
+        elif self.obstacle_mode == "static":
+            self.obstacles = []
+            for i in range(9):
+                if i == 4:
+                    continue
+                obstacle = [i % 3, 0, i // 3 + 0.5]
+                self.obstacles.append(obstacle)
+
+            self.obstacles = np.array(self.obstacles)
+        elif self.obstacle_mode == "dynamic":
+            pass
+        else:
+            pass
+
+        ## Set Render
         self.simulation_start_time = 0
         self.frames_since_last_render = self.render_skip_frames = 0
         self.render_every_nth_frame = 1
@@ -121,7 +150,7 @@ class QuadrotorEnvMulti(gym.Env):
         if self.scene is None:
             self.scene = Quadrotor3DSceneMulti(
                 models=models,
-                w=640, h=480, resizable=True, obstacles=self.envs[0].obstacles, viewpoint=self.envs[0].viewpoint,
+                w=640, h=480, resizable=True, obstacles=self.envs[0].obstacles, viewpoint=self.envs[0].viewpoint, obstacle_mode=self.obstacle_mode
             )
         else:
             self.scene.update_models(models)
@@ -138,7 +167,7 @@ class QuadrotorEnvMulti(gym.Env):
             obs_ext = self.extend_obs_space(obs)
             obs = obs_ext
 
-        self.scene.reset(tuple(e.goal for e in self.envs), self.all_dynamics())
+        self.scene.reset(tuple(e.goal for e in self.envs), self.all_dynamics(), obstacles=self.obstacles)
 
         return obs
 
@@ -200,7 +229,7 @@ class QuadrotorEnvMulti(gym.Env):
                 self.rews_settle = np.zeros(self.num_agents)
                 self.rews_settle_raw = np.zeros(self.num_agents)
                 self.settle_count = np.zeros(self.num_agents)
-        elif self.quads_mode == "same_goal":
+        elif self.quads_mode == "dynamic_goal":
             tick = self.envs[0].tick
             # teleport every 5 secs
             control_step_for_five_sec = int(5.0 * self.envs[0].control_freq)
@@ -217,6 +246,10 @@ class QuadrotorEnvMulti(gym.Env):
 
                 for i, env in enumerate(self.envs):
                     env.goal = self.goal[i]
+        elif self.quads_mode == "static_goal":
+            pass
+        else:
+            pass
 
         ## DONES
         if any(dones):
@@ -242,7 +275,7 @@ class QuadrotorEnvMulti(gym.Env):
 
         render_start = time.time()
         goals = tuple(e.goal for e in self.envs)
-        self.scene.render_chase(all_dynamics=self.all_dynamics(), goals=goals, mode=mode)
+        self.scene.render_chase(all_dynamics=self.all_dynamics(), goals=goals, mode=mode, obstalces=self.obstacles)
         render_time = time.time() - render_start
 
         desired_time_between_frames = realtime_control_period * self.frames_since_last_render / self.render_speed

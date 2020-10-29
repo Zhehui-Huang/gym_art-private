@@ -677,7 +677,8 @@ class QuadrotorSingle:
                  sim_steps=2,
                  obs_repr="xyz_vxyz_R_omega", ep_time=7, obstacles_num=0, room_size=10, init_random_state=False,
                  rew_coeff=None, sense_noise=None, verbose=False, gravity=GRAV,
-                 t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, use_numba=False, swarm_obs=False, num_agents=1):
+                 t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, use_numba=False, swarm_obs=False, num_agents=1,
+                 view_mode='local'):
         np.seterr(under='ignore')
         """
         Args:
@@ -757,6 +758,9 @@ class QuadrotorSingle:
         ## Statistics vars
         self.traj_count = 0
 
+        ## View / Camera mode
+        self.view_mode = view_mode
+
         ###############################################################################
         ## DYNAMICS (and randomization)
 
@@ -806,10 +810,15 @@ class QuadrotorSingle:
 
         ################################################################################
         ## DIMENSIONALITY
-        if self.dim_mode == '1D' or self.dim_mode == '2D':
-            self.viewpoint = 'side'
-        else:
-            self.viewpoint = 'chase'
+        if self.view_mode == 'local':
+            if self.dim_mode == '1D' or self.dim_mode == '2D':
+                self.viewpoint = 'side'
+            else:
+                self.viewpoint = 'chase'
+        elif self.view_mode == 'global':
+            self.viewpoint = 'global'
+        elif self.view_mode == 'follow':
+            self.viewpoint = 'follow'
 
         ################################################################################
         ## EPISODE PARAMS

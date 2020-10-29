@@ -87,6 +87,60 @@ class SideCamera(object):
         center = self.pos_smooth
         return eye, center, up
 
+# Global Camera
+class GlobalCamera(object):
+    def __init__(self, view_dist=4):
+        self.view_dist = view_dist
+        self.degree = 180
+    def reset(self, goal, pos, vel):
+        self.pos_smooth = pos
+
+    def step(self, pos, vel):
+        self.pos_smooth = [-1.5, 0.0, 2.5] # camera position
+    def look_at(self):
+        up = npa(0, 0, 1)
+        eye = self.pos_smooth
+        center = [0.0, 0.0, 2.0] # pattern center
+        return eye, center, up
+
+# Global Camera
+class FollowCamera(object):
+    def __init__(self, view_dist=4):
+        self.view_dist = view_dist
+
+    def reset(self, goal, pos, vel):
+        self.goal = goal
+        self.pos_smooth = pos
+        self.vel_smooth = vel
+        self.right_smooth, _ = normalize(cross(vel, npa(0, 0, 1)))
+
+    def step(self, pos, vel, max_dis):
+        # lowpass filter
+        ap = 0.6
+        av = 0.999
+        ar = 0.9
+        self.pos_smooth = ap * self.pos_smooth + (1 - ap) * pos
+        self.vel_smooth = av * self.vel_smooth + (1 - av) * vel
+        self.view_dist = max_dis
+
+        veln, n = normalize(self.vel_smooth)
+        up = npa(0, 0, 1)
+        ideal_vel, _ = normalize(self.goal - self.pos_smooth)
+        if True or np.abs(veln[2]) > 0.95 or n < 0.01 or np.dot(veln, ideal_vel) < 0.7:
+            # look towards goal even though we are not heading there
+            right, _ = normalize(cross(ideal_vel, up))
+        else:
+            right, _ = normalize(cross(veln, up))
+        self.right_smooth = ar * self.right_smooth + (1 - ar) * right
+
+    # return eye, center, up suitable for gluLookAt
+    def look_at(self):
+        up = npa(0, 0, 1)
+        back, _ = normalize(cross(self.right_smooth, up))
+        to_eye, _ = normalize(0.9 * back + 0.3 * self.right_smooth)
+        eye = self.pos_smooth + self.view_dist * (to_eye + 0.3 * up)
+        center = self.pos_smooth
+        return eye, center, up
 
 def quadrotor_3dmodel(model, quad_id=0):
     # params["body"] = {"l": 0.03, "w": 0.03, "h": 0.004, "m": 0.005}
@@ -198,11 +252,15 @@ class Quadrotor3DScene(object):
         else:
             self.goal_forced_diameter = None
         self.update_goal_diameter()
-        
+
         if self.viepoint == 'chase':
             self.chase_cam = ChaseCamera(view_dist=self.diameter * 15)
         elif self.viepoint == 'side':
             self.chase_cam = SideCamera(view_dist=self.diameter * 15)
+        elif self.viepoint == 'global':
+            self.chase_cam = GlobalCamera(view_dist=self.diameter * 15)
+        elif self.viepoint == 'follow':
+            self.chase_cam = FollowCamera(view_dist=self.diameter * 15)
 
         self.scene = None
         self.window_target = None
@@ -214,7 +272,7 @@ class Quadrotor3DScene(object):
             self.diameter = 2 * self.quad_arm
         else:
             self.diameter = 2 * np.linalg.norm(self.model.params["motor_pos"]["xyz"][:2])
-         
+
         if self.goal_forced_diameter:
             self.goal_diameter = self.goal_forced_diameter
         else:
@@ -247,11 +305,11 @@ class Quadrotor3DScene(object):
         self.chase_cam.view_dist = self.diameter * 15
 
         self.create_goal(goal=(0,0,0))
-        
+
         bodies = [r3d.BackToFront([floor, self.shadow_transform]),
             self.goal_transform, self.quad_transform] + self.goal_arrows
-        
-            
+
+
 
         if self.obstacles:
             bodies += self.obstacles.bodies
@@ -267,7 +325,7 @@ class Quadrotor3DScene(object):
         ## Goal
         self.goal_transform = r3d.transform_and_color(np.eye(4),
             (0.85, 0.55, 0), r3d.sphere(self.goal_diameter/2, 18))
-        
+
         goal_arr_len, goal_arr_r, goal_arr_sect  = 1.5 * self.goal_diameter, 0.02 * self.goal_diameter, 10
         self.goal_arrows = []
 
@@ -277,13 +335,13 @@ class Quadrotor3DScene(object):
         self.goal_arrows_rot.append(np.eye(3))
 
         self.goal_arrows.append(r3d.transform_and_color(
-            np.array([[0,0,1,0],[0,1,0,0],[-1,0,0,0],[0,0,0,1]]), 
+            np.array([[0,0,1,0],[0,1,0,0],[-1,0,0,0],[0,0,0,1]]),
             (1., 0., 0.), r3d.arrow(goal_arr_r, goal_arr_len, goal_arr_sect)))
         self.goal_arrows.append(r3d.transform_and_color(
-            np.array([[1,0,0,0],[0,0,1,0],[0,-1,0,0],[0,0,0,1]]), 
+            np.array([[1,0,0,0],[0,0,1,0],[0,-1,0,0],[0,0,0,1]]),
             (0., 1., 0.), r3d.arrow(goal_arr_r, goal_arr_len, goal_arr_sect)))
         self.goal_arrows.append(r3d.transform_and_color(
-            np.eye(4), 
+            np.eye(4),
             (0., 0., 1.), r3d.arrow(goal_arr_r, goal_arr_len, goal_arr_sect)))
 
     def update_goal(self, goal):
@@ -315,7 +373,7 @@ class Quadrotor3DScene(object):
             self.chase_cam.step(dynamics.pos, dynamics.vel)
             self.have_state = True
             self.fpv_lookat = dynamics.look_at()
-            
+
             self.update_goal(goal=goal)
 
             matrix = r3d.trans_and_rot(dynamics.pos, dynamics.rot)
@@ -328,7 +386,7 @@ class Quadrotor3DScene(object):
 
     def render_chase(self, dynamics, goal, mode="human"):
         if mode == "human":
-            if self.window_target is None: 
+            if self.window_target is None:
                 self.window_target = r3d.WindowTarget(self.window_w, self.window_h, resizable=self.resizable)
                 self._make_scene()
             self.update_state(dynamics=dynamics, goal=goal)
@@ -345,7 +403,7 @@ class Quadrotor3DScene(object):
             return np.flipud(self.video_target.read())
 
     def render_obs(self, dynamics, goal):
-        if self.obs_target is None: 
+        if self.obs_target is None:
             self.obs_target = r3d.FBOTarget(self.obs_hw[0], self.obs_hw[1])
             self._make_scene()
         self.update_state(dynamics=dynamics, goal=goal)
