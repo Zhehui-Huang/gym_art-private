@@ -18,6 +18,7 @@ class SingleObstacle():
         self.force_mode = force_mode
         self.pos = np.zeros(3)
         self.vel = np.zeros(3)
+        self.omega = np.zeros(3) # angular_velocity
         self.reset()
 
     def reset(self, set_obstacle=False):
@@ -31,6 +32,10 @@ class SingleObstacle():
         else:
             self.pos = np.array([20.0, 20.0, 20.0])
             self.vel = np.array([0., 0., 0.])
+
+        size = self.get_size()
+        quaternion = self.get_quaternion()
+        return quaternion, size, self.pos, self.vel
 
     def step_electron(self, set_obstacles=False):
         force_pos = 2 * self.goal_central - self.pos
@@ -52,7 +57,7 @@ class SingleObstacle():
 
     def step(self, quads_pos=None, quads_vel=None, set_obstacles=False):
         if self.force_mode == "electron":
-            return self.step_electron(set_obstacles=set_obstacles)
+            self.step_electron(set_obstacles=set_obstacles)
         elif self.force_mode == "gravity":
             self.vel = self.vel
             self.pos += self.dt * self.vel
@@ -63,7 +68,9 @@ class SingleObstacle():
         # The pos and vel of the obstacle give by the agents
         rel_pos_obstacle_agents = self.pos - quads_pos
         rel_vel_obstacle_agents = self.vel - quads_vel
-        return rel_pos_obstacle_agents, rel_vel_obstacle_agents
+        size = self.get_size()
+        quaternion = self.get_quaternion()
+        return quaternion, size, rel_pos_obstacle_agents, rel_vel_obstacle_agents
 
     def static_obstacle(self):
         pass
@@ -112,3 +119,17 @@ class SingleObstacle():
             raise NotImplementedError()
 
         return collision_arr
+
+    def get_size(self):
+        if self.type == "sphere":
+            return np.array([self.size, self.size, self.size])
+        elif self.type == "cube":
+            return np.array([self.size, self.size, self.size])
+
+    def get_quaternion(self):
+        omega_value = np.linalg.norm(self.omega)
+        theta = omega_value / 2
+        unit_omega = self.omega / max(omega_value, EPS)
+        quaternion = [np.cos(theta)]
+        quaternion.extend(unit_omega * np.sin(theta))
+        return np.array(quaternion)

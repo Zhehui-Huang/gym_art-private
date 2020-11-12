@@ -29,12 +29,15 @@ class MultiObstacles():
 
     def reset(self, obs=None, quads_pos=None, quads_vel=None, set_obstacles=False):
         for obstacle in self.obstacles:
-            obstacle.reset(set_obstacle=set_obstacles)
+            quaternion, size, pos, vel = obstacle.reset(set_obstacle=set_obstacles)
 
             # Add rel_pos and rel_vel to obs
-            rel_pos = obstacle.pos - quads_pos
-            rel_vel = obstacle.vel - quads_vel
-            obs = np.concatenate((obs, rel_pos, rel_vel), axis=1)  # TODO: Improve, same as extend_obs function
+            rel_pos = pos - quads_pos
+            rel_vel = vel - quads_vel
+            quaternion_arr = np.array([quaternion for _ in range(len(quads_pos))])
+            size_arr = np.array([size for _ in range(len(quads_pos))])
+
+            obs = np.concatenate((obs, quaternion_arr, size_arr, rel_pos, rel_vel), axis=1)  # TODO: Improve, same as extend_obs function
 
         return obs
 
@@ -42,10 +45,13 @@ class MultiObstacles():
         # Generate force, mimic force between electron, F = k*q1*q2 / r^2,
         # Here, F = r^2, k = 1, q1 = q2 = 1
         for obstacle in self.obstacles:
-            rel_pos_obstacle_agents, rel_vel_obstacle_agents = obstacle.step(quads_pos=quads_pos, quads_vel=quads_vel,
+            quaternion, size, rel_pos_obstacle_agents, rel_vel_obstacle_agents = obstacle.step(quads_pos=quads_pos, quads_vel=quads_vel,
                                                                              set_obstacles=set_obstacles)
 
-            obs = np.concatenate((obs, rel_pos_obstacle_agents, rel_vel_obstacle_agents), axis=1)
+            quaternion_arr = np.array([quaternion for _ in range(len(quads_pos))])
+            size_arr = np.array([size for _ in range(len(quads_pos))])
+
+            obs = np.concatenate((obs, quaternion_arr, size_arr, rel_pos_obstacle_agents, rel_vel_obstacle_agents), axis=1)
 
         return obs
 
