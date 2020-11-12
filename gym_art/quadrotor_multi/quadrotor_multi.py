@@ -28,7 +28,7 @@ class QuadrotorEnvMulti(gym.Env):
                  resample_goals=False, t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False,
                  quads_dist_between_goals=0.0, quads_mode='static_goal', swarm_obs=False, quads_use_numba=False, quads_settle=False,
                  quads_settle_range_coeff=10, quads_vel_reward_out_range=0.8, quads_goal_dimension='2D', quads_obstacle_mode='no_obstacles', quads_view_mode='local', quads_obstacle_num=0,
-                 quads_obstacle_type='sphere', quads_obstacle_size=0.0, collision_force=True):
+                 quads_obstacle_type='sphere', quads_obstacle_size=0.0, collision_force=True, force_mode="electron"):
 
         super().__init__()
 
@@ -120,6 +120,9 @@ class QuadrotorEnvMulti(gym.Env):
         ## Set Obstacles
         self.obstacle_max_init_vel = 4.0 * self.envs[0].max_init_vel
         self.obstacle_init_box = 0.5 * self.envs[0].box
+        self.obstacle_box_size = 2.0
+        self.obstacle_box = np.array(
+            [[-self.obstacle_box_size, -self.obstacle_box_size, 0], [self.obstacle_box_size, self.obstacle_box_size, 2.0 * self.obstacle_box_size]])
         self.mean_goals_z = np.mean(self.goal[:, 2])
         self.dt = 1.0 / sim_freq
         self.obstacle_mode = quads_obstacle_mode
@@ -130,9 +133,10 @@ class QuadrotorEnvMulti(gym.Env):
         self.obstacle_settle_count = np.zeros(self.num_agents)
 
         self.obstacles = MultiObstacles(mode=self.obstacle_mode, num_obstacles=self.obstacle_num,
-                                     max_init_vel=self.obstacle_max_init_vel, init_box=self.obstacle_init_box,
-                                     mean_goals=self.mean_goals_z, goal_central=self.goal_central,
-                                     dt=self.dt, quad_size=self.envs[0].dynamics.arm, type=self.obstacle_type, size=self.obstacle_size)
+                                        max_init_vel=self.obstacle_max_init_vel, init_box=self.obstacle_init_box,
+                                        mean_goals=self.mean_goals_z, goal_central=self.goal_central,
+                                        dt=self.dt, quad_size=self.envs[0].dynamics.arm, type=self.obstacle_type, size=self.obstacle_size,
+                                        force_mode=force_mode)
 
         ## Set Render
         self.simulation_start_time = 0
@@ -330,6 +334,15 @@ class QuadrotorEnvMulti(gym.Env):
                     self.set_obstacles = True
                     tmp_obs = self.obstacles.reset(obs=obs, quads_pos=self.pos, quads_vel=quads_vel,
                                                    set_obstacles=self.set_obstacles)
+            else:
+                for obstacle in self.obstacles.obstacles:
+                    pos_clip = np.clip(obstacle.pos, a_min=self.obstacle_box[0], a_max=self.obstacle_box[1])
+                    if not np.array_equal(obstacle.pos, pos_clip):
+                        print(obstacle.pos)
+                        print(pos_clip)
+                        self.set_obstacles = False
+                        obstacle.reset()
+
 
             obs = tmp_obs
 
