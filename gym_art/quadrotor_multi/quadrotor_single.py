@@ -4,10 +4,8 @@ Quadrotor simulation for OpenAI Gym, with components reusable elsewhere.
 Also see: D. Mellinger, N. Michael, V.Kumar. 
 Trajectory Generation and Control for Precise Aggressive Maneuvers with Quadrotors
 http://journals.sagepub.com/doi/pdf/10.1177/0278364911434236
-
 Developers:
 James Preiss, Artem Molchanov, Tao Chen 
-
 References:
 [1] RotorS: https://www.researchgate.net/profile/Fadri_Furrer/publication/309291237_RotorS_-_A_Modular_Gazebo_MAV_Simulator_Framework/links/5a0169c4a6fdcc82a3183f8f/RotorS-A-Modular-Gazebo-MAV-Simulator-Framework.pdf
 [2] CrazyFlie modelling: http://mikehamer.info/assets/papers/Crazyflie%20Modelling.pdf
@@ -684,17 +682,9 @@ class QuadrotorSingle:
                  sim_steps=2,
                  obs_repr="xyz_vxyz_R_omega", ep_time=7, obstacles_num=0, room_size=10, init_random_state=False,
                  rew_coeff=None, sense_noise=None, verbose=False, gravity=GRAV,
-<<<<<<< HEAD
-<<<<<<< HEAD
                  t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, use_numba=False, swarm_obs=False, num_agents=1,quads_settle=False,
                  quads_settle_range_coeff=10, quads_vel_reward_out_range=0.8,
                  view_mode='local', obstacle_mode='no_obstacles', obstacle_num=0):
-=======
-                 t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, use_numba=False):
->>>>>>> 123b27e... Created numba based functions for step1 and add_noise (#8)
-=======
-                 t2w_std=0.005, t2t_std=0.0005, excite=False, dynamics_simplification=False, use_numba=False, swarm_obs=False, num_agents=1):
->>>>>>> 6697a71... Multi quad (#9)
         np.seterr(under='ignore')
         """
         Args:
@@ -839,15 +829,7 @@ class QuadrotorSingle:
             else:
                 self.viewpoint = 'chase'
         else:
-<<<<<<< HEAD
-<<<<<<< HEAD
             self.viewpoint = 'global'
-=======
-            self.viewpoint = 'global' # 'chase'
->>>>>>> 906f412... Vertical pattern with global camera
-=======
-            self.viewpoint = 'chase' #'global' # 'chase'
->>>>>>> 3ad89af... Add collision visualization
 
         ################################################################################
         ## EPISODE PARAMS
@@ -963,18 +945,10 @@ class QuadrotorSingle:
 
         obs_comps = self.obs_repr.split("_")
         if self.swarm_obs and self.num_agents > 1:
-<<<<<<< HEAD
-<<<<<<< HEAD
             obs_comps = obs_comps + (['rxyz'] + ['rvxyz']) * (self.num_agents-1)
         if self.obstacle_mode != 'no_obstacles':
             obs_comps = obs_comps + (['rorot'] + ['rosize'] +['roxyz'] + ['rovxyz']) * (self.obstacle_num)
 
-=======
-            obs_comps = obs_comps + (['xyz'] + ['vxyz']) * (self.num_agents-1)
->>>>>>> 6697a71... Multi quad (#9)
-=======
-            obs_comps = obs_comps + (['rxyz'] + ['rvxyz']) * (self.num_agents-1)
->>>>>>> 00964cf... Modify extend_obs_space func (#10)
         print("Observation components:", obs_comps)
         obs_low, obs_high = [], []
         for comp in obs_comps:

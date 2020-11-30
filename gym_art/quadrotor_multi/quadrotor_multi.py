@@ -40,15 +40,15 @@ class QuadrotorEnvMulti(gym.Env):
 
         self.envs = []
         self.quads_dist_between_goals = quads_dist_between_goals
-        self.single_digit_goal_list = [1, 0]
+        self.single_digit_goal_list = [5, 2, 7] 
         # iteratively yield the digit list
         def gentr_fn(alist):
             while 1:
                 for j in alist:
                     yield j
         self.iter_digits = gentr_fn(self.single_digit_goal_list)
-        self.set_obstacles = False      # obstacle mode
-        self.set_transition = False     # transition mode in quads_mode="digit_goals"
+        self.set_obstacles = False    # obstacle mode
+        self.pattern_mode = 'zoom'    # if quads_mode = 'digit_goals', there are 3 modes: 'transition', 'zoom', 'static'
 
         for i in range(self.num_agents):
             e = QuadrotorSingle(
@@ -58,6 +58,10 @@ class QuadrotorEnvMulti(gym.Env):
                 rew_coeff, sense_noise, verbose, gravity, t2w_std, t2t_std, excite, dynamics_simplification,
                 quads_use_numba, self.swarm_obs, self.num_agents, quads_settle, quads_settle_range_coeff, quads_vel_reward_out_range, quads_view_mode, 
                 quads_obstacle_mode, quads_obstacle_num
+            )
+            self.envs.append(e)
+
+        self.resample_goals = resample_goals
 
         self.scene = None
 
@@ -104,7 +108,6 @@ class QuadrotorEnvMulti(gym.Env):
         if self.goal_dimension == "2D":
             self.goal = []
             self.init_goal_pos = []
-                # self.settle_count = np.zeros(self.num_agents)
             for i in range(self.num_agents):
                 if self.quads_mode == 'circular_config':
                     degree = 2 * pi * i / self.num_agents
@@ -112,7 +115,7 @@ class QuadrotorEnvMulti(gym.Env):
                     goal_y = delta * np.sin(degree)
                     goal = [goal_x, goal_y, 2.0]     
                 elif self.quads_mode == "digit_goals":
-                    if self.set_transition:
+                    if self.pattern_mode == 'transition':
                         goal = self.single_digit_goal(5, i)
                     else:
                         goal = self.digit_goals(i)
@@ -145,6 +148,7 @@ class QuadrotorEnvMulti(gym.Env):
         self.obstacle_mode = quads_obstacle_mode
         self.obstacle_num = quads_obstacle_num
         self.obstacle_type = quads_obstacle_type
+        self.obstacle_size = quads_obstacle_size
         self.set_obstacles = False
         self.obstacle_settle_count = np.zeros(self.num_agents)
 
@@ -301,9 +305,15 @@ class QuadrotorEnvMulti(gym.Env):
         ## digit 2
         # set x-axis
         if agent==13 or agent==14 or agent==15 or agent==21:
-            goal_x = 0.0 * delta + horizontal_dis
+            goal_x = 0.0 * delta + horizontal_dis 
         if agent==12 or agent==16 or agent==20:
-            goal_x = 1.0 * delta + horizontal_dis
+            goal_x = 1.0 * delta + horizontal_dis 
+        if agent==11 or agent==17 or agent==18 or agent==19:
+            goal_x = 2.0 * delta + horizontal_dis
+        # set y-axis
+        if agent==11 or agent==12 or agent==13:
+            goal_y = vertical_low if set_vertical else 0.0 * delta
+        if agent==14:
             goal_y = (vertical_high - vertical_low) / 4 * 1 + vertical_low if set_vertical else 1.0 * delta * vertical_factor
         if agent==15 or agent==16 or agent==17:
             goal_y = (vertical_high - vertical_low) / 4 * 2 + vertical_low if set_vertical else 2.0 * delta * vertical_factor
@@ -355,6 +365,33 @@ class QuadrotorEnvMulti(gym.Env):
                 models=models,
                 w=640, h=480, resizable=True, obstacles=self.obstacles, viewpoint=self.envs[0].viewpoint,
                 obstacle_mode=self.obstacle_mode
+            )
+        else:
+            self.scene.update_models(models)
+
+        for i, e in enumerate(self.envs):
+            self.goal[i] = self.init_goal_pos[i]
+            e.goal = self.goal[i]
+            e.rew_coeff = self.rew_coeff
+
+            observation = e.reset()
+            obs.append(observation)
+
+        # extend obs to see neighbors
+        if self.swarm_obs and self.num_agents > 1:
+            obs_ext = self.extend_obs_space(obs)
+            obs = obs_ext
+
+        # Reset Obstacles
+        self.set_obstacles = False
+        self.obstacle_settle_count = np.zeros(self.num_agents)
+        quads_pos = np.array([e.dynamics.pos for e in self.envs])
+        quads_vel = np.array([e.dynamics.vel for e in self.envs])
+        obs = self.obstacles.reset(obs=obs, quads_pos=quads_pos, quads_vel=quads_vel, set_obstacles=self.set_obstacles)
+
+        self.scene.reset(tuple(e.goal for e in self.envs), self.all_dynamics(), obstacles=self.obstacles)
+
+        self.collisions_per_episode = 0
         return obs
 
     # noinspection PyTypeChecker
@@ -410,14 +447,14 @@ class QuadrotorEnvMulti(gym.Env):
                 if abs(dis) < 0.02:
                     self.settle_count[i] += 1
                 else:
-                    self.settle_count[i] = 0
+                    self.settle_count = np.zeros(self.num_agents)
                     break
 
             # drones settled at the goal for 1 sec
-            control_step_for_one_sec = int(self.envs[0].control_freq * 2)
+            control_step_for_one_sec = int(self.envs[0].control_freq)
             tmp_count = self.settle_count >= control_step_for_one_sec
             if all(tmp_count):
-                tmp_goals = []
+                np.random.shuffle(self.goal)
                 for i, env in enumerate(self.envs):
                     env.goal = self.goal[i]
 
@@ -442,7 +479,17 @@ class QuadrotorEnvMulti(gym.Env):
                 z = random.random() * 2 * box_size
                 if z < 0.25:
                     z = 0.25
+                
+                self.goal = [[x, y, z] for i in range(self.num_agents)]
+                self.goal = np.array(self.goal)
+
+                for i, env in enumerate(self.envs):
+                    env.goal = self.goal[i]
         elif self.quads_mode == "static_goal":
+            pass
+        elif self.quads_mode == "lissajous3D":
+            control_freq = self.envs[0].control_freq
+            tick = self.envs[0].tick / control_freq
             x, y, z = self.lissajous3D(tick)
             goal_x, goal_y, goal_z = self.goal[0][0], self.goal[0][1], self.goal[0][2]
             x_new, y_new, z_new = x + goal_x, y + goal_y,  z+ goal_z
@@ -464,7 +511,6 @@ class QuadrotorEnvMulti(gym.Env):
             control_step_for_one_sec = int(self.envs[0].control_freq * 2)
             tmp_count = self.settle_count >= control_step_for_one_sec
             if all(tmp_count):
-                tmp_goals = []
                 for i, env in enumerate(self.envs):
                     if i == 0:  # switch goal after all agents are initialized
                         self.single_digit_goal_list = [1, 0]
@@ -481,6 +527,8 @@ class QuadrotorEnvMulti(gym.Env):
                     infos[i]["rewards"][
                         "rewraw_quadsettle"] = self.rews_settle_raw[i]
 
+                self.goal = [[x, y, z] for i in range(self.num_agents)]
+                self.goal = np.array(self.goal)
                 self.rews_settle = np.zeros(self.num_agents)
                 self.rews_settle_raw = np.zeros(self.num_agents)
                 self.settle_count = np.zeros(self.num_agents)
@@ -499,13 +547,21 @@ class QuadrotorEnvMulti(gym.Env):
             if all(tmp_count):
                 tmp_goals = []
                 for i, env in enumerate(self.envs):
-                    if self.set_transition:
-                        if i ==0: # switch goal after all agents are initialized
+                    if self.pattern_mode == 'transition':
+                        if i == 0: # switch goal after all agents are initialized
                             digit = next(self.iter_digits)
                         tmp_single_goal = self.single_digit_goal(digit, i)
                         env.goal = tmp_single_goal
-                    else:
+                    elif self.pattern_mode == 'static':
                         tmp_goals = self.digit_goals(i)
+                        env.goal = tmp_goals
+                    elif self.pattern_mode == 'zoom':
+                        # moving close
+                        if i == 0 :
+                            step = 0.5
+                            dis = next(self.move_dis) * step
+                        tmp_goals = self.digit_goals(i)
+                        tmp_goals[1] -= dis
                         env.goal = tmp_goals
 
                     # Add settle rewards
