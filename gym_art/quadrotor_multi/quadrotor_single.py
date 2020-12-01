@@ -4,10 +4,8 @@ Quadrotor simulation for OpenAI Gym, with components reusable elsewhere.
 Also see: D. Mellinger, N. Michael, V.Kumar. 
 Trajectory Generation and Control for Precise Aggressive Maneuvers with Quadrotors
 http://journals.sagepub.com/doi/pdf/10.1177/0278364911434236
-
 Developers:
 James Preiss, Artem Molchanov, Tao Chen 
-
 References:
 [1] RotorS: https://www.researchgate.net/profile/Fadri_Furrer/publication/309291237_RotorS_-_A_Modular_Gazebo_MAV_Simulator_Framework/links/5a0169c4a6fdcc82a3183f8f/RotorS-A-Modular-Gazebo-MAV-Simulator-Framework.pdf
 [2] CrazyFlie modelling: http://mikehamer.info/assets/papers/Crazyflie%20Modelling.pdf

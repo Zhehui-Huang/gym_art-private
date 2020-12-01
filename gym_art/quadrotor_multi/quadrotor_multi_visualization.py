@@ -213,4 +213,3 @@ class Quadrotor3DSceneMulti:
             self.cam3p.look_at(*self.chase_cam.look_at())
             r3d.draw(self.scene, self.cam3p, self.video_target)
             return np.flipud(self.video_target.read())
-
